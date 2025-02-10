@@ -1,0 +1,36 @@
+name: Sync to UIUC Repo
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout private repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config user.name "bee0511"
+          git config user.email "bee0511@gmail.com"
+
+      - name: Add UIUC repo as upstream remote
+        run: |
+          git remote add upstream https://bee0511:${{ secrets.UIUC_PAT }}@github.com/illinois-cs-coursework/sp25_cs438_jy98.git
+
+      - name: Fetch UIUC repo (upstream)
+        run: git fetch upstream
+
+      - name: Merge upstream changes into local main
+        run: |
+          git checkout main
+          git merge upstream/main --no-edit
+
+      - name: Push merged changes to UIUC repo
+        run: git push upstream main
