@@ -51,8 +51,8 @@ Module.symvers
 Mkfile.old
 dkms.conf
 
-# executable files with no suffix
-*
 
 # want to upload .gitignore file to github
 !.gitignore
+
+.vscode/
