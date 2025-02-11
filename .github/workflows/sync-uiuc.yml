@@ -4,11 +4,14 @@ on:
   push:
     branches:
       - main
+  schedule:
+    - cron: "0 * * * *"
+  workflow_dispatch:
 
 jobs:
-  sync:
+  sync_main:
+    if: github.repository == 'bee0511/CS438'
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout private repository
         uses: actions/checkout@v3
@@ -18,7 +21,7 @@ jobs:
       - name: Setup SSH Key
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.UIUC_SSH_KEY }}" > ~/.ssh/id_rsa
+          echo "${{ secrets.UIUC_SSH_KEY }}" | tr -d '\r' > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan github.com >> ~/.ssh/known_hosts
 
@@ -31,7 +34,7 @@ jobs:
         run: |
           git remote add upstream git@github.com:illinois-cs-coursework/sp25_cs438_jy98.git
 
-      - name: Fetch UIUC repo (upstream)
+      - name: Fetch UIUC repo
         run: git fetch upstream
 
       - name: Merge upstream changes into local main
@@ -41,3 +44,38 @@ jobs:
 
       - name: Push merged changes to UIUC repo
         run: git push upstream main
+
+  sync_grades:
+    if: github.repository == 'bee0511/CS438'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout private repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Setup SSH Key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.UIUC_SSH_KEY }}" | tr -d '\r' > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan github.com >> ~/.ssh/known_hosts
+
+      - name: Add UIUC repo as upstream remote
+        run: |
+          git remote add upstream git@github.com:illinois-cs-coursework/sp25_cs438_jy98.git
+
+      - name: Fetch `_grades` branch from UIUC repo
+        run: git fetch upstream _grades || echo "_grades branch does not exist in upstream"
+
+      - name: Create `_grades` branch in CS438 if not exists
+        run: |
+          if ! git show-ref --verify --quiet refs/heads/_grades; then
+            git checkout -b _grades upstream/_grades || git checkout -b _grades
+          else
+            git checkout _grades
+            git reset --hard upstream/_grades || echo "No updates in _grades"
+          fi
+
+      - name: Push `_grades` branch to CS438
+        run: git push origin _grades --force
