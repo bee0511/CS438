@@ -149,9 +149,9 @@ int main(int argc, char *argv[])
     }
 
     // Receive response and write to file
-    while ((numbytes = recv(sockfd, buf, BUF_SIZE-1, 0)) > 0) {
-        buf[numbytes] = '\0';
-        fprintf(output_file, "%s", buf);
+    // https://stackoverflow.com/questions/62699018/how-to-use-write-or-fwrite-for-writing-data-to-terminal-stdout
+    while ((numbytes = recv(sockfd, buf, BUF_SIZE, 0)) > 0) {
+        fwrite(buf, sizeof(char), numbytes, output_file);
     }
 
     if (numbytes == -1) {
