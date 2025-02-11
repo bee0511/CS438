@@ -17,6 +17,7 @@
 #define BACKLOG 10	 // how many pending connections queue will hold
 
 #define DEBUG 1
+#define BUF_SIZE 1024 * 1024
 using namespace std;
 
 void HTTP_handler(int s){
@@ -27,7 +28,7 @@ void HTTP_handler(int s){
     tive “whoops, file not found!” messages. For any other errors, you may simply return 400 Bad
     Request.
     */
-    char buf[1024];
+    char buf[BUF_SIZE];
     int numbytes;
     string str_buf;
     if((numbytes = recv(s, buf, 1024, 0)) <= 0){
@@ -65,7 +66,16 @@ void HTTP_handler(int s){
     if(send(s, response.c_str(), response.length(), 0) == -1){
         perror("send");
     }
-    while((numbytes = fread(buf, 1, 1024, file)) > 0){
+	fflush(stdout);
+    while(true){
+		memset(buf, 0, BUF_SIZE);
+		numbytes = fread(buf, sizeof(char), BUF_SIZE, file);
+		#ifdef DEBUG
+		cout << "Read " << numbytes << " bytes" << endl;
+		#endif
+		if(numbytes == 0){
+			break;
+		}
         if(send(s, buf, numbytes, 0) == -1){
             perror("send");
         }

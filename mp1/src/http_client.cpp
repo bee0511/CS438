@@ -15,7 +15,7 @@
 
 #define PORT "3490" // the port client will be connecting to 
 
-#define BUF_SIZE 1024 // max number of bytes we can get at once 
+#define BUF_SIZE 1024 * 1024 // max number of bytes we can get at once 
 
 #define DEBUG 1
 
@@ -150,8 +150,15 @@ int main(int argc, char *argv[])
 
     // Receive response and write to file
     // https://stackoverflow.com/questions/62699018/how-to-use-write-or-fwrite-for-writing-data-to-terminal-stdout
-    while ((numbytes = recv(sockfd, buf, BUF_SIZE, 0)) > 0) {
+    while (true) {
+        numbytes = recv(sockfd, buf, BUF_SIZE, 0);
+        if (numbytes == 0) {
+            break;
+        }
         fwrite(buf, sizeof(char), numbytes, output_file);
+        #ifdef DEBUG
+        cout << "Received " << numbytes << " bytes" << endl;
+        #endif
     }
 
     if (numbytes == -1) {
