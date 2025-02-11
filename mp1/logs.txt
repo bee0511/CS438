@@ -55,3 +55,22 @@ Program executed correctly
 Score = 75
 -------------------------
 
+Version = 4
+
+-------------------------
+Compilation successful for jy98
+
+Test 1 
+Use wget to receive a small file 
+Program executed correctly 
+
+Test 2: 
+Use your client to receive a large file 
+Incorrect file received 
+
+Test 3 
+Use wget to concurrently receive files 
+Program executed correctly 
+Score = 75
+-------------------------
+
