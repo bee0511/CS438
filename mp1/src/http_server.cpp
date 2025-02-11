@@ -16,7 +16,7 @@
 
 #define BACKLOG 10	 // how many pending connections queue will hold
 
-#define DEBUG 1
+// #define DEBUG 1
 #define BUF_SIZE 1024
 using namespace std;
 
@@ -31,7 +31,7 @@ void HTTP_handler(int s){
     char buf[BUF_SIZE];
     int numbytes;
     string str_buf;
-    memset(buf, 0, BUF_SIZE); // 清空緩衝區
+    memset(buf, 0, BUF_SIZE);
     if((numbytes = recv(s, buf, 1024, 0)) <= 0){
         perror("recv");
         exit(1);

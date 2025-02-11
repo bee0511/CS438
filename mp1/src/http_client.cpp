@@ -17,7 +17,7 @@
 
 #define BUF_SIZE 1024 // max number of bytes we can get at once 
 
-#define DEBUG 1
+// #define DEBUG 1
 
 using namespace std;
 
