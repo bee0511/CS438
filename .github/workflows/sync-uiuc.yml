@@ -78,4 +78,9 @@ jobs:
           fi
 
       - name: Push `_grades` branch to CS438
-        run: git push origin _grades --force
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/bee0511/CS438.git
+          git push origin _grades --force
+        
