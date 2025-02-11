@@ -15,6 +15,13 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Setup SSH Key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.UIUC_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan github.com >> ~/.ssh/known_hosts
+
       - name: Configure Git
         run: |
           git config user.name "bee0511"
@@ -22,7 +29,7 @@ jobs:
 
       - name: Add UIUC repo as upstream remote
         run: |
-          git remote add upstream https://bee0511:${{ secrets.UIUC_PAT }}@github.com/illinois-cs-coursework/sp25_cs438_jy98.git
+          git remote add upstream git@github.com:illinois-cs-coursework/sp25_cs438_jy98.git
 
       - name: Fetch UIUC repo (upstream)
         run: git fetch upstream
