@@ -150,6 +150,7 @@ int main(int argc, char *argv[])
 
     // Receive response and write to file
     // https://stackoverflow.com/questions/62699018/how-to-use-write-or-fwrite-for-writing-data-to-terminal-stdout
+    bool received_header = false;
     while (true) {
         memset(buf, 0, BUF_SIZE);
         numbytes = recv(sockfd, buf, BUF_SIZE, 0);
@@ -160,14 +161,27 @@ int main(int argc, char *argv[])
         if (numbytes == 0) {
             break;
         }
+        #ifdef DEBUG
+        cout << "Received " << numbytes << " bytes" << endl;
+        #endif
+        if(!received_header){
+            received_header = true;
+            // Skip the header
+            // https://www.geeksforgeeks.org/strstr-in-ccpp/
+            char *body = strstr(buf, "\r\n\r\n");
+            if(body != NULL){
+                body += 4; // Skip "\r\n\r\n"
+                int offset = body - buf;
+                int body_size = numbytes - offset;
+                fwrite(body, sizeof(char), body_size, output_file);
+            }
+            continue;
+        }
         int written = fwrite(buf, sizeof(char), numbytes, output_file);
         if (written < numbytes) {
             perror("fwrite");
             exit(1);
         }
-        #ifdef DEBUG
-        cout << "Received " << numbytes << " bytes" << endl;
-        #endif
     }
 
     fclose(output_file);

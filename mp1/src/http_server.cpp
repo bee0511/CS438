@@ -74,18 +74,13 @@ void HTTP_handler(int s){
         if (numbytes == 0) {
             break;
         }
-        int total_sent = 0;
-        while (total_sent < numbytes) {
-            int sent = send(s, buf + total_sent, numbytes - total_sent, 0);
-            if (sent == -1) {
-                perror("send");
-                fclose(file);
-                return;
-            }
-            total_sent += sent;
-        }
+        int sent = send(s, buf, numbytes, 0);
+		if (sent == -1) {
+			perror("send");
+			exit(1);
+		}
         #ifdef DEBUG
-        cout << "Sent " << total_sent << " bytes" << endl;
+        cout << "Sent " << sent << " bytes" << endl;
         #endif
     }
     fclose(file);
