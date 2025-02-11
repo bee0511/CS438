@@ -32,45 +32,57 @@ void HTTP_handler(int s){
     int numbytes;
     string str_buf;
     memset(buf, 0, BUF_SIZE);
-    if((numbytes = recv(s, buf, 1024, 0)) <= 0){
+    if((numbytes = recv(s, buf, BUF_SIZE, 0)) <= 0){
         perror("recv");
         exit(1);
     }
     buf[numbytes] = '\0';
+
 #ifdef DEBUG
     cout << "server: received " << numbytes << " bytes: " << endl;
     cout << buf << endl;
 #endif
+
     str_buf = string(buf);
     string method = str_buf.substr(0, str_buf.find(" "));
     string path = str_buf.substr(5, str_buf.find(" ", 5) - 5);
+
 #ifdef DEBUG
     cout << "Method: " << method << endl;
     cout << "Path: " << path << endl;
 #endif
+
+	string response;
+
     if(method != "GET" || path.size() == 0){
-        string response = "HTTP/1.1 400 Bad Request\r\n\r\n";
+        response = "HTTP/1.1 400 Bad Request\r\n\r\n";
         if(send(s, response.c_str(), response.length(), 0) == -1){
             perror("send");
         }
         return;
     }
+
     FILE *file = fopen(path.c_str(), "r");
     if(file == NULL){
-        string response = "HTTP/1.1 404 Not Found\r\n\r\n";
+        response = "HTTP/1.1 404 Not Found\r\n\r\n";
         if(send(s, response.c_str(), response.length(), 0) == -1){
             perror("send");
         }
         return;
     }
-    string response = "HTTP/1.1 200 OK\r\n\r\n";
+
+    response = "HTTP/1.1 200 OK\r\n\r\n";
     if(send(s, response.c_str(), response.length(), 0) == -1){
         perror("send");
     }
-	fflush(stdout);
+
     while (true) {
         memset(buf, 0, BUF_SIZE);
         numbytes = fread(buf, sizeof(char), BUF_SIZE, file);
+		if (numbytes == -1) {
+			perror("fread");
+			exit(1);
+		}
         if (numbytes == 0) {
             break;
         }
@@ -188,8 +200,6 @@ int main(int argc, char *argv[])
 
 		if (!fork()) { // this is the child process
 			close(sockfd); // child doesn't need the listener
-			// if (send(new_fd, "Hello, world!", 13, 0) == -1)
-			// 	perror("send");
 
             HTTP_handler(new_fd);
 

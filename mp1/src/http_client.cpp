@@ -34,9 +34,11 @@ struct host_info parse_url(string url) {
         exit(1);
     }
     struct host_info info;
-    int index = 7;
+    int index = 7; // Skip "http://"
+
+    // Get hostname
     while(index < url.length()){
-        // Get hostname
+        // Find the end of the hostname
         if (url[index] == '/' || url[index] == ':') {
             info.hostname = url.substr(7, index - 7);
             break;
@@ -46,7 +48,7 @@ struct host_info parse_url(string url) {
 
     // Get port
     if (url[index] == ':') {
-        index++;
+        index++; // Skip ":"
         int start = index;
         while(url[index] != '/') {
             index++;
