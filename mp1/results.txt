@@ -1,4 +1,4 @@
-Version: 5, score: 75, extra days: 0
+Version: 6, score: 100, extra days: 0
 
 
 -------------------------
@@ -10,11 +10,11 @@ Program executed correctly
 
 Test 2: 
 Use your client to receive a large file 
-Incorrect file received 
+Program executed correctly 
 
 Test 3 
 Use wget to concurrently receive files 
 Program executed correctly 
-Score = 75
+Score = 100
 -------------------------
 
