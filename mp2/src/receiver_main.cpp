@@ -96,17 +96,25 @@
              exit(1);
          }
  #ifdef DEBUG
-         printf("Received packet %lu\n", packet.seq);
+         printf("[*] Received packet %lu\n", packet.seq);
  #endif
          if (packet.fin) {
-             printf("Packet %lu is FIN\n", packet.seq);
+ #ifdef DEBUG
+             printf("[*] Packet %lu is FIN\n", packet.seq);
+ #endif
+             for (int i = 0; i < 5; i++) {
+                 if (sendto(s, &(packet.seq), sizeof(packet.seq), 0, (struct sockaddr*)&si_other, slen) == -1) {
+                     perror("sendto");
+                     exit(1);
+                 }
+             }
              break;
          }
      }
  
      // Write to file
-     for(auto it = buffer.begin(); it != buffer.end(); it++) {
-         if(it->first == 0) {
+     for (auto it = buffer.begin(); it != buffer.end(); it++) {
+         if (it->first == 0) {
              continue;
          }
          fwrite(it->second.data, sizeof(char), it->second.len, fp);

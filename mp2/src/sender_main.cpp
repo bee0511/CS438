@@ -31,8 +31,6 @@
  
  using namespace std;
  
- // Source: https://stackoverflow.com/questions/71598718/timer-with-stdthread
- 
  class ReliableSender {
     private:
      char* hostname;
@@ -78,7 +76,7 @@
      this->sockfd = 0;
      this->slen = 0;
  
-     this->num_packets = ceil((double)bytesToTransfer / MSS);
+     this->num_packets = (bytesToTransfer + MSS - 1) / MSS;
      this->send_base = 1;
      this->dupACKcount = 0;
      this->state = SLOW_START;
@@ -208,8 +206,7 @@
  }
  
  void ReliableSender::sendData() {
- 
-     if(send_base > num_packets){
+     if (send_base > num_packets) {
          Packet finPacket;
          finPacket.seq = 0;
          finPacket.len = 0;
@@ -231,7 +228,7 @@
          }
  
  #ifdef DEBUG
-         printf("Sending packet %lu\n", nextseqnum);
+         printf("[*] Sending packet %lu\n", nextseqnum);
  #endif
          // Send packet
          if (sendto(sockfd, &packets[nextseqnum], sizeof(packets[nextseqnum]), 0, (struct sockaddr*)&si_other, slen) == -1) {
@@ -251,7 +248,9 @@
  void ReliableSender::reliablyTransfer() {
      init();
  
-     cout << "Sending " << num_packets << " packets" << endl;
+ #ifdef DEBUG
+     cout << "[*] Sending " << num_packets << " packets" << endl;
+ #endif
      sendData();
      uint64_t ack;
      while (true) {
@@ -265,15 +264,17 @@
              perror("recvfrom");
              exit(1);
          }
-         if(ack == 0){
+         if (ack == 0) {
+ #ifdef DEBUG
+             cout << "[*] Received FIN ACK" << endl;
+ #endif
              break;
          }
- #ifdef DEBUG
-         // printf("Received ACK %lu\n", ack);
- #endif
          // Timeout
          if (recv_len == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
-             cout << "Timeout" << endl;
+ #ifdef DEBUG
+             cout << "[!] Timeout" << endl;
+ #endif
              TimeoutHandler();
              continue;
          }
@@ -292,7 +293,7 @@
          }
      }
  
-     printf("Closing the socket\n");
+     printf("[*] Closing the socket\n");
      close(sockfd);
      fclose(fp);
      return;
