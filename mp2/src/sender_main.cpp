@@ -1,69 +1,71 @@
-/* 
- * File:   sender_main.c
- * Author: 
+/*
+ * File:   sender_main.cpp
+ * Author: Jian-Fong Yu
  *
- * Created on 
+ * Created on
  */
 
+#include <arpa/inet.h>
+#include <errno.h>
+#include <netinet/in.h>
+#include <pthread.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <arpa/inet.h>
-#include <netinet/in.h>
-#include <stdio.h>
-#include <sys/types.h>
 #include <sys/socket.h>
-#include <unistd.h>
-#include <pthread.h>
 #include <sys/stat.h>
-#include <signal.h>
-#include <string.h>
 #include <sys/time.h>
+#include <sys/types.h>
+#include <unistd.h>
 
-#include <iostream>
-#include <queue>
 #include <cmath>
-#include <errno.h>
-#include <cstdio>
+#include <iostream>
+#include <unordered_map>
+#include <vector>
 
-#define MSS 1024    // Maximum Segment Size
-#define TIMEOUT 500000 // Timeout in milliseconds
+#include "packet.h"
+#include "params.h"
+
+#define DEBUG 1
+
 using namespace std;
 
-struct Packet {
-    uint64_t seq;
-    uint64_t ack;
-    char data[MSS];
-    uint64_t len;
-    enum PacketType {DATA, ACK, FIN, FINACK} type;
-};
+// Source: https://stackoverflow.com/questions/71598718/timer-with-stdthread
 
 class ReliableSender {
-private:
+   private:
     char* hostname;
     unsigned short int hostUDPport;
     char* filename;
     unsigned long long int bytesToTransfer;
-    FILE *fp;
+    FILE* fp;
     int sockfd;
-    int slen;
+    socklen_t slen;
     struct sockaddr_in si_other;
 
     uint64_t num_packets;
-    uint64_t seq;
-    uint64_t num_sent;
-    uint64_t num_recv;
+    uint64_t send_base;
     uint64_t dupACKcount;
-    enum State {SLOW_START, CONGESTION_AVOID, FAST_RECOVERY} state;
+    enum State { SLOW_START,
+                 CONGESTION_AVOID,
+                 FAST_RECOVERY } state;
     uint64_t cwnd;
     uint64_t ssthresh;
 
+    vector<Packet> packets;
+    unordered_map<uint64_t, bool> acked;
 
-public:
+   public:
     ReliableSender(char* hostname, unsigned short int hostUDPport, char* filename, unsigned long long int bytesToTransfer);
     void init();
     void reliablyTransfer();
-
+    void startTimer();
+    void stopTimer();
+    void sendData();
+    void newACKHandler();
+    void dupACKHandler();
+    void TimeoutHandler();
 };
 
 ReliableSender::ReliableSender(char* hostname, unsigned short int hostUDPport, char* filename, unsigned long long int bytesToTransfer) {
@@ -76,34 +78,32 @@ ReliableSender::ReliableSender(char* hostname, unsigned short int hostUDPport, c
     this->sockfd = 0;
     this->slen = 0;
 
-    this->num_packets = ceil((double)bytesToTransfer / MSS);
-    this->seq = 0;
-    this->num_sent = 0;
-    this->num_recv = 0;
+    this->num_packets = ceil((double)bytesToTransfer / MSS) + 1;
+    this->send_base = 1;
     this->dupACKcount = 0;
     this->state = SLOW_START;
-    this->cwnd = MSS;
-    this->ssthresh = 64 * MSS;  // 64KB
+    this->cwnd = 1;       // 1 window size
+    this->ssthresh = 64;  // 64 window size
+
+    this->acked.clear();
 }
 
-void ReliableSender::init(){
-    //Open the file
+void ReliableSender::init() {
+    // Open the file
     fp = fopen(filename, "rb");
     if (fp == NULL) {
         printf("Could not open file to send.");
         exit(1);
     }
 
-	/* Determine how many bytes to transfer */
+    slen = sizeof(si_other);
 
-    slen = sizeof (si_other);
-
-    if ((sockfd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1){
+    if ((sockfd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1) {
         perror("socket");
         exit(1);
     }
 
-    memset((char *) &si_other, 0, sizeof (si_other));
+    memset((char*)&si_other, 0, sizeof(si_other));
     si_other.sin_family = AF_INET;
     si_other.sin_port = htons(hostUDPport);
     if (inet_aton(hostname, &si_other.sin_addr) == 0) {
@@ -111,6 +111,19 @@ void ReliableSender::init(){
         exit(1);
     }
 
+    // Initialize packets
+    packets.resize(num_packets);
+    for (uint64_t i = 0; i < num_packets; i++) {
+        packets[i].seq = i;
+        size_t bytesRead = fread(packets[i].data, 1, MSS, fp);
+        if (bytesRead < MSS) {
+            packets[i].data[bytesRead] = '\0';
+            packets[i].fin = true;
+        }
+    }
+}
+
+void ReliableSender::startTimer() {
     // Set timeout for the socket
     // Ref: https://stackoverflow.com/questions/4181784/how-to-set-socket-timeout-in-c-when-making-multiple-connections
     struct timeval timeout;
@@ -120,31 +133,158 @@ void ReliableSender::init(){
         perror("setsockopt failed");
         exit(1);
     }
+}
 
+void ReliableSender::stopTimer() {
+    // Remove timeout for the socket
+    struct timeval timeout;
+    timeout.tv_sec = 0;
+    timeout.tv_usec = 0;
+    if (setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) < 0) {
+        perror("setsockopt failed");
+        exit(1);
+    }
+}
 
+void ReliableSender::newACKHandler() {
+    switch (state) {
+        case SLOW_START:
+            cwnd++;
+            dupACKcount = 0;
+            sendData();
+            break;
+        case CONGESTION_AVOID:
+            cwnd += 1 / cwnd;
+            dupACKcount = 0;
+            sendData();
+            break;
+        case FAST_RECOVERY:
+            cwnd = ssthresh;
+            dupACKcount = 0;
+            state = CONGESTION_AVOID;
+            sendData();
+            break;
+        default:
+            break;
+    }
+}
+
+void ReliableSender::dupACKHandler() {
+    switch (state) {
+        case SLOW_START:
+        case CONGESTION_AVOID:
+            dupACKcount++;
+            if (dupACKcount == 3) {
+                ssthresh = cwnd / 2;
+                cwnd = ssthresh + 3;
+                state = FAST_RECOVERY;
+                sendData();
+            }
+            break;
+        case FAST_RECOVERY:
+            cwnd++;
+            sendData();
+            break;
+        default:
+            break;
+    }
+}
+
+void ReliableSender::TimeoutHandler() {
+    switch (state) {
+        case SLOW_START:
+        case CONGESTION_AVOID:
+        case FAST_RECOVERY:
+            ssthresh = cwnd / 2;
+            cwnd = 1;
+            dupACKcount = 0;
+            state = SLOW_START;
+            sendData();
+            break;
+        default:
+            break;
+    }
+}
+
+void ReliableSender::sendData() {
+    // Send packets within the congestion window
+    uint64_t nextseqnum = send_base;
+    while (send_base < num_packets && nextseqnum < send_base + cwnd) {
+        // Skip if packet is already acked
+        if (acked[nextseqnum] == true) {
+            nextseqnum++;
+            continue;
+        }
+
+        // Send packet
+        if (sendto(sockfd, &packets[nextseqnum], sizeof(packets[nextseqnum]), 0, (struct sockaddr*)&si_other, slen) == -1) {
+            perror("sendto");
+            exit(1);
+        }
+
+        // First packet in the window
+        if (send_base == nextseqnum) {
+            // Keep track of the first packet in the window
+            startTimer();
+        }
+        nextseqnum++;
+    }
 }
 
 void ReliableSender::reliablyTransfer() {
     init();
 
+    sendData();
+    uint64_t ack;
+    while (send_base < num_packets) {
+        if (cwnd >= ssthresh && state == SLOW_START) {
+            state = CONGESTION_AVOID;
+        }
+
+        // Receive ACK
+        int recv_len = recvfrom(sockfd, &ack, sizeof(ack), 0, (struct sockaddr*)&si_other, &slen);
+        if (recv_len == -1 && (errno != EAGAIN || errno != EWOULDBLOCK)) {
+            perror("recvfrom");
+            exit(1);
+        }
+#ifdef DEBUG
+        printf("Received ACK %lu\n", ack);
+#endif
+        // Timeout
+        if (recv_len == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
+            TimeoutHandler();
+            continue;
+        }
+
+        if (acked[ack] == false) {
+            // New ACK
+            acked[ack] = true;
+            newACKHandler();
+        } else {
+            // Duplicate ACK
+            dupACKHandler();
+        }
+
+        if (ack == send_base) {
+            send_base++;
+        }
+    }
+
     printf("Closing the socket\n");
     close(sockfd);
+    fclose(fp);
     return;
 }
 
 int main(int argc, char** argv) {
-
     if (argc != 5) {
         fprintf(stderr, "usage: %s receiver_hostname receiver_port filename_to_xfer bytes_to_xfer\n\n", argv[0]);
         exit(1);
     }
 
-    ReliableSender sender(argv[1], (unsigned short int) atoi(argv[2]), argv[3], atoll(argv[4]));
+    ReliableSender sender(argv[1], (unsigned short int)atoi(argv[2]), argv[3], atoll(argv[4]));
 
     sender.reliablyTransfer();
 
-
     return (EXIT_SUCCESS);
 }
-
-
