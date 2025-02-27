@@ -2,6 +2,6 @@
 #ifndef PARAMS_H
 #define PARAMS_H
 
-#define TIMEOUT 500000  // Timeout in milliseconds
+#define TIMEOUT 400  // Timeout in microseconds
 
 #endif

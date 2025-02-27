@@ -9,6 +9,7 @@
 struct Packet {
     uint64_t seq;
     char data[MSS];
+    uint32_t len;
     bool fin;
 };
 
