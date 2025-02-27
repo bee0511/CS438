@@ -27,7 +27,9 @@
  #include "packet.h"
  #include "params.h"
  
-//  #define DEBUG 1
+ // #define DEBUG 1
+ // #define DEBUG_SEND 1
+ // #define DEBUG_INFO 1
  
  using namespace std;
  
@@ -48,8 +50,8 @@
      enum State { SLOW_START,
                   CONGESTION_AVOID,
                   FAST_RECOVERY } state;
-     uint64_t cwnd;
-     uint64_t ssthresh;
+     double cwnd;
+     double ssthresh;
  
      vector<Packet> packets;
      unordered_map<uint64_t, bool> acked;
@@ -64,6 +66,7 @@
      void newACKHandler();
      void dupACKHandler();
      void TimeoutHandler();
+     void printInfo();
  };
  
  ReliableSender::ReliableSender(char* hostname, unsigned short int hostUDPport, char* filename, unsigned long long int bytesToTransfer) {
@@ -80,8 +83,8 @@
      this->send_base = 1;
      this->dupACKcount = 0;
      this->state = SLOW_START;
-     this->cwnd = 1;       // 1 window size
-     this->ssthresh = 64;  // 64 window size
+     this->cwnd = 1.0;       // 1 window size
+     this->ssthresh = 64.0;  // 64 window size
  
      this->acked.clear();
  }
@@ -122,6 +125,30 @@
      }
  }
  
+ void ReliableSender::printInfo() {
+     // Set output color to be white
+     cout << "\033[0m";
+     cout << "[*] Send base: " << send_base << endl;
+     cout << "[*] Dup ACK count: " << dupACKcount << endl;
+     cout << "[*] State: ";
+     switch (state) {
+         case SLOW_START:
+             cout << "SLOW_START" << endl;
+             break;
+         case CONGESTION_AVOID:
+             cout << "CONGESTION_AVOID" << endl;
+             break;
+         case FAST_RECOVERY:
+             cout << "FAST_RECOVERY" << endl;
+             break;
+         default:
+             cout << "UNKNOWN" << endl;
+             break;
+     }
+     cout << "[*] Congestion window size (cwnd): " << cwnd << endl;
+     cout << "[*] Slow start threshold (ssthresh): " << ssthresh << endl;
+ }
+ 
  void ReliableSender::startTimer() {
      // Set timeout for the socket
      // Ref: https://stackoverflow.com/questions/4181784/how-to-set-socket-timeout-in-c-when-making-multiple-connections
@@ -153,7 +180,7 @@
              sendData();
              break;
          case CONGESTION_AVOID:
-             cwnd += 1 / cwnd;
+             cwnd += 1.0 / cwnd;
              dupACKcount = 0;
              sendData();
              break;
@@ -166,6 +193,9 @@
          default:
              break;
      }
+ #ifdef DEBUG_INFO
+     printInfo();
+ #endif
  }
  
  void ReliableSender::dupACKHandler() {
@@ -187,6 +217,9 @@
          default:
              break;
      }
+ #ifdef DEBUG_INFO
+     printInfo();
+ #endif
  }
  
  void ReliableSender::TimeoutHandler() {
@@ -203,6 +236,9 @@
          default:
              break;
      }
+ #ifdef DEBUG_INFO
+     printInfo();
+ #endif
  }
  
  void ReliableSender::sendData() {
@@ -227,8 +263,10 @@
              continue;
          }
  
- #ifdef DEBUG
-         printf("[*] Sending packet %lu\n", nextseqnum);
+ #ifdef DEBUG_SEND
+         // Set output color to be gray
+         cout << "\033[1;30m";
+         cout << "[*] Sending packet " << nextseqnum << endl;
  #endif
          // Send packet
          if (sendto(sockfd, &packets[nextseqnum], sizeof(packets[nextseqnum]), 0, (struct sockaddr*)&si_other, slen) == -1) {
@@ -265,14 +303,15 @@
              exit(1);
          }
          if (ack == 0) {
- #ifdef DEBUG
+             cout << "\033[1;30m";
              cout << "[*] Received FIN ACK" << endl;
- #endif
              break;
          }
          // Timeout
          if (recv_len == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
  #ifdef DEBUG
+             // Set output color to be red
+             cout << "\033[1;31m";
              cout << "[!] Timeout" << endl;
  #endif
              TimeoutHandler();
@@ -282,10 +321,24 @@
          if (acked[ack] == false) {
              // New ACK
              acked[ack] = true;
+ #ifdef DEBUG
+             // Set output color to be green
+             cout << "\033[1;32m";
+             cout << "[+] Received new ACK " << ack << endl;
+ #endif
              newACKHandler();
-         } else {
+             // } else if (acked[ack] == true) {
+         } else if (acked[ack] == true && ack >= send_base) {
+ #ifdef DEBUG
+             // Set output color to be yellow
+             cout << "\033[1;33m";
+             cout << "[*] Received duplicate ACK " << ack << endl;
+ #endif
              // Duplicate ACK
              dupACKHandler();
+         } else {
+             // Ignore outdated ACK
+             continue;
          }
  
          if (ack == send_base) {
@@ -293,10 +346,19 @@
          }
      }
  
-     printf("[*] Closing the socket\n");
+     // Set output color to be white
+     cout << "\033[0m";
+     cout << "[*] File transfer completed" << endl;
      close(sockfd);
      fclose(fp);
      return;
+ }
+ 
+ // Add signal handler to handle ctrl C
+ void signalHandler(int signum) {
+     cout << "\033[0m";
+     cout << "[!] File transfer interrupted" << endl;
+     exit(signum);
  }
  
  int main(int argc, char** argv) {
@@ -304,6 +366,8 @@
          fprintf(stderr, "usage: %s receiver_hostname receiver_port filename_to_xfer bytes_to_xfer\n\n", argv[0]);
          exit(1);
      }
+ 
+     signal(SIGINT, signalHandler);
  
      ReliableSender sender(argv[1], (unsigned short int)atoi(argv[2]), argv[3], atoll(argv[4]));
  

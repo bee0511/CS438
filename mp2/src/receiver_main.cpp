@@ -20,7 +20,7 @@
  #include "packet.h"
  #include "params.h"
  
-//  #define DEBUG 1
+ #define DEBUG 1
  
  using namespace std;
  
@@ -96,7 +96,7 @@
              exit(1);
          }
  #ifdef DEBUG
-         printf("[*] Received packet %lu\n", packet.seq);
+         printf("[+] Received packet %lu\n", packet.seq);
  #endif
          if (packet.fin) {
  #ifdef DEBUG
