@@ -92,3 +92,46 @@ Sender stalled
 Score = 40
 -------------------------
 
+Version = 4
+
+-------------------------
+Compilation successful for jy98
+
+Test 1 
+Transfer a single byte in 3 seconds
+Program executed correctly 
+
+Test 2 
+Transfer 50 KB in 10 seconds
+Program executed correctly 
+
+Test 3 
+Transfer 10 MB in 20 seconds
+Sender stalled 
+
+Test 4 
+Transfer 1 MB in 10 seconds with 5 percent drop
+Sender stalled 
+
+Test 5 
+Transfer 10 KB in 10 seconds with 25 percent loss
+Program executed correctly 
+
+Test 6 
+Check parallel transfer bandwidth sharing (note: it's being given 999000999000 as the numBytes argument)
+Sender stalled during bandwidth check phase
+
+Test 7 
+Friendliness with TCP (note: it's being given 999000999000 as the numBytes argument)
+Very large file transfer failed 
+
+Test 8 
+Friendliness with TCP with 1% loss(note: it's being given 999000999000 as the numBytes argument)
+Very large file transfer failed 
+
+Test 9 
+Competition vs TCP
+Sender stalled 
+Score = 40
+-------------------------
+
