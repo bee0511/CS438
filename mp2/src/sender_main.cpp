@@ -27,11 +27,20 @@
  #include "packet.h"
  #include "params.h"
  
- // #define DEBUG 1
- // #define DEBUG_SEND 1
+ #define DEBUG 1
+ #define DEBUG_SEND 1
  // #define DEBUG_INFO 1
+ #define DEBUG_NEWACK 1
+ #define DEBUG_DUPACK 1
+ #define DEBUG_TIMEOUT 1
  
  using namespace std;
+ 
+ struct StateCount {
+     uint64_t slow_start_count = 0;
+     uint64_t congestion_avoid_count = 0;
+     uint64_t fast_recovery_count = 0;
+ } state_count;
  
  class ReliableSender {
     private:
@@ -47,6 +56,7 @@
      uint64_t num_packets;
      uint64_t send_base;
      uint64_t dupACKcount;
+     uint64_t prev_sent_seq;
      enum State { SLOW_START,
                   CONGESTION_AVOID,
                   FAST_RECOVERY } state;
@@ -63,6 +73,7 @@
      void startTimer();
      void stopTimer();
      void sendData();
+     void sendNewPacket(double prev_cwnd = 0);
      void newACKHandler();
      void dupACKHandler();
      void TimeoutHandler();
@@ -85,6 +96,7 @@
      this->state = SLOW_START;
      this->cwnd = 1.0;       // 1 window size
      this->ssthresh = 64.0;  // 64 window size
+     this->prev_sent_seq = 1;
  
      this->acked.clear();
  }
@@ -133,12 +145,15 @@
      cout << "[*] State: ";
      switch (state) {
          case SLOW_START:
+             state_count.slow_start_count++;
              cout << "SLOW_START" << endl;
              break;
          case CONGESTION_AVOID:
+             state_count.congestion_avoid_count++;
              cout << "CONGESTION_AVOID" << endl;
              break;
          case FAST_RECOVERY:
+             state_count.fast_recovery_count++;
              cout << "FAST_RECOVERY" << endl;
              break;
          default:
@@ -173,11 +188,12 @@
  }
  
  void ReliableSender::newACKHandler() {
+     double prev_cwnd = cwnd;
      switch (state) {
          case SLOW_START:
              cwnd++;
              dupACKcount = 0;
-             sendData();
+             sendNewPacket(prev_cwnd);
              break;
          case CONGESTION_AVOID:
              cwnd += 1.0 / cwnd;
@@ -188,7 +204,7 @@
              cwnd = ssthresh;
              dupACKcount = 0;
              state = CONGESTION_AVOID;
-             sendData();
+             sendNewPacket(prev_cwnd);
              break;
          default:
              break;
@@ -199,6 +215,7 @@
  }
  
  void ReliableSender::dupACKHandler() {
+     double prev_cwnd = cwnd;
      switch (state) {
          case SLOW_START:
          case CONGESTION_AVOID:
@@ -212,7 +229,8 @@
              break;
          case FAST_RECOVERY:
              cwnd++;
-             sendData();
+             sendNewPacket(prev_cwnd);
+ 
              break;
          default:
              break;
@@ -239,6 +257,45 @@
  #ifdef DEBUG_INFO
      printInfo();
  #endif
+ }
+ 
+ void ReliableSender::sendNewPacket(double prev_cwnd) {
+     if (send_base > num_packets) {
+         Packet finPacket;
+         finPacket.seq = 0;
+         finPacket.len = 0;
+         finPacket.fin = true;
+         if (sendto(sockfd, &finPacket, sizeof(finPacket), 0, (struct sockaddr*)&si_other, slen) == -1) {
+             perror("sendto");
+             exit(1);
+         }
+         return;
+     }
+     // No new packet to send
+     if (cwnd - prev_cwnd < 1) {
+         return;
+     }
+     // Send new packets within the congestion window
+     uint64_t nextseqnum = prev_sent_seq + 1;
+     while (nextseqnum <= num_packets && nextseqnum < send_base + cwnd) {
+         // Skip if packet is already acked
+         if (acked[nextseqnum] == true) {
+             nextseqnum++;
+             continue;
+         }
+ #ifdef DEBUG_SEND
+         // Set output color to be gray
+         cout << "\033[1;30m";
+         cout << "[*] Sending packet " << nextseqnum << endl;
+ #endif
+         // Send packet
+         if (sendto(sockfd, &packets[nextseqnum], sizeof(packets[nextseqnum]), 0, (struct sockaddr*)&si_other, slen) == -1) {
+             perror("sendto");
+             exit(1);
+         }
+         nextseqnum++;
+     }
+     prev_sent_seq = nextseqnum - 1;
  }
  
  void ReliableSender::sendData() {
@@ -281,14 +338,13 @@
          }
          nextseqnum++;
      }
+     prev_sent_seq = nextseqnum - 1;
  }
  
  void ReliableSender::reliablyTransfer() {
      init();
  
- #ifdef DEBUG
      cout << "[*] Sending " << num_packets << " packets" << endl;
- #endif
      sendData();
      uint64_t ack;
      while (true) {
@@ -309,7 +365,7 @@
          }
          // Timeout
          if (recv_len == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
- #ifdef DEBUG
+ #ifdef DEBUG_TIMEOUT
              // Set output color to be red
              cout << "\033[1;31m";
              cout << "[!] Timeout" << endl;
@@ -321,31 +377,27 @@
          if (acked[ack] == false) {
              // New ACK
              acked[ack] = true;
- #ifdef DEBUG
+ #ifdef DEBUG_NEWACK
              // Set output color to be green
              cout << "\033[1;32m";
              cout << "[+] Received new ACK " << ack << endl;
  #endif
              newACKHandler();
              // } else if (acked[ack] == true) {
-         } else if (acked[ack] == true && ack >= send_base) {
- #ifdef DEBUG
+         } else if (acked[ack] == true) {
+ #ifdef DEBUG_DUPACK
              // Set output color to be yellow
              cout << "\033[1;33m";
              cout << "[*] Received duplicate ACK " << ack << endl;
  #endif
              // Duplicate ACK
              dupACKHandler();
-         } else {
-             // Ignore outdated ACK
-             continue;
          }
- 
-         if (ack == send_base) {
+         // Set send_base to the first encountered unacked packet
+         while (acked[send_base] == true) {
              send_base++;
          }
      }
- 
      // Set output color to be white
      cout << "\033[0m";
      cout << "[*] File transfer completed" << endl;
@@ -358,6 +410,12 @@
  void signalHandler(int signum) {
      cout << "\033[0m";
      cout << "[!] File transfer interrupted" << endl;
+     // Dump state count info
+     cout << "[*] State count info:" << endl;
+     cout << "[*] SLOW_START: " << state_count.slow_start_count << endl;
+     cout << "[*] CONGESTION_AVOID: " << state_count.congestion_avoid_count << endl;
+     cout << "[*] FAST_RECOVERY: " << state_count.fast_recovery_count << endl;
+ 
      exit(signum);
  }
  
