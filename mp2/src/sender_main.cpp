@@ -200,7 +200,8 @@
          case CONGESTION_AVOID:
              cwnd += 1.0 / cwnd;
              dupACKcount = 0;
-             sendData();
+             sendNewPacket(prev_cwnd);
+             // sendData();
              break;
          case FAST_RECOVERY:
              cwnd = ssthresh;
@@ -294,8 +295,7 @@
              continue;
          }
  #ifdef DEBUG_SEND
-         // Set output color to be light green
-         cout << "\033[1;92m";
+         cout << "\033[1;30m";  // Set output color to be gray
          cout << "[*] Sending new packet " << nextseqnum << endl;
  #endif
          Packet pkt = getPacket(nextseqnum);
@@ -346,8 +346,8 @@
              startTimer();
          }
          nextseqnum++;
-         prev_sent_seq = nextseqnum - 1;
      }
+     prev_sent_seq = nextseqnum - 1;
  }
  
  void ReliableSender::reliablyTransfer() {
