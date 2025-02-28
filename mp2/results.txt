@@ -1,4 +1,4 @@
-Version: 5, score: 30, extra days: 0
+Version: 6, score: 50, extra days: 0
 
 
 -------------------------
@@ -14,19 +14,19 @@ Program executed correctly
 
 Test 3 
 Transfer 10 MB in 20 seconds
-Sender stalled 
+Incorrect bytes sent 
 
 Test 4 
 Transfer 1 MB in 10 seconds with 5 percent drop
-Sender stalled 
+Program executed correctly 
 
 Test 5 
 Transfer 10 KB in 10 seconds with 25 percent loss
-Sender stalled 
+Program executed correctly 
 
 Test 6 
 Check parallel transfer bandwidth sharing (note: it's being given 999000999000 as the numBytes argument)
-Sender stalled during bandwidth check phase
+Very large file transfer failed 
 
 Test 7 
 Friendliness with TCP (note: it's being given 999000999000 as the numBytes argument)
@@ -39,6 +39,6 @@ Very large file transfer failed
 Test 9 
 Competition vs TCP
 Sender stalled 
-Score = 30
+Score = 50
 -------------------------
 
