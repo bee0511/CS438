@@ -1,4 +1,4 @@
-Version: 8, score: 50, extra days: 0
+Version: 9, score: 80, extra days: 0
 
 
 -------------------------
@@ -26,19 +26,19 @@ Program executed correctly
 
 Test 6 
 Check parallel transfer bandwidth sharing (note: it's being given 999000999000 as the numBytes argument)
-Sender stalled during bandwidth check phase
+Program executed correctly 
 
 Test 7 
 Friendliness with TCP (note: it's being given 999000999000 as the numBytes argument)
-TCP friendliness failed, TCP only got <1 Mbps (need 7 Mbps)
+Program executed correctly 
 
 Test 8 
 Friendliness with TCP with 1% loss(note: it's being given 999000999000 as the numBytes argument)
-TCP friendliness with 1% loss failed, TCP only got 1.57 Mbps (need 7 Mbps)
+Program executed correctly 
 
 Test 9 
 Competition vs TCP
 Incorrect bytes sent 
-Score = 50
+Score = 80
 -------------------------
 

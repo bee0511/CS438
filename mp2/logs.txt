@@ -275,3 +275,46 @@ Incorrect bytes sent
 Score = 50
 -------------------------
 
+Version = 9
+
+-------------------------
+Compilation successful for jy98
+
+Test 1 
+Transfer a single byte in 3 seconds
+Program executed correctly 
+
+Test 2 
+Transfer 50 KB in 10 seconds
+Program executed correctly 
+
+Test 3 
+Transfer 10 MB in 20 seconds
+Incorrect bytes sent 
+
+Test 4 
+Transfer 1 MB in 10 seconds with 5 percent drop
+Program executed correctly 
+
+Test 5 
+Transfer 10 KB in 10 seconds with 25 percent loss
+Program executed correctly 
+
+Test 6 
+Check parallel transfer bandwidth sharing (note: it's being given 999000999000 as the numBytes argument)
+Program executed correctly 
+
+Test 7 
+Friendliness with TCP (note: it's being given 999000999000 as the numBytes argument)
+Program executed correctly 
+
+Test 8 
+Friendliness with TCP with 1% loss(note: it's being given 999000999000 as the numBytes argument)
+Program executed correctly 
+
+Test 9 
+Competition vs TCP
+Incorrect bytes sent 
+Score = 80
+-------------------------
+
