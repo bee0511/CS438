@@ -65,6 +65,22 @@
  
      vector<Packet> packets;
      unordered_map<uint64_t, bool> acked;
+
+     Packet getPacket(uint64_t seq) {
+        Packet packet;
+        packet.seq = seq;
+        packet.fin = false;
+        if (fseek(fp, (seq - 1) * MSS, SEEK_SET) != 0) {
+            perror("fseek");
+            exit(1);
+        }
+        size_t bytesRead = fread(packet.data, 1, MSS, fp);
+        packet.len = bytesRead;
+        if (bytesRead < MSS) {
+            packet.data[bytesRead] = '\0';
+        }
+        return packet;
+    }
  
     public:
      ReliableSender(char* hostname, unsigned short int hostUDPport, char* filename, unsigned long long int bytesToTransfer);
@@ -97,7 +113,6 @@
      this->cwnd = 1.0;       // 1 window size
      this->ssthresh = 64.0;  // 64 window size
      this->prev_sent_seq = 1;
- 
      this->acked.clear();
  }
  
@@ -125,16 +140,16 @@
      }
  
      // Initialize packets
-     packets.resize(num_packets + 1);
-     for (uint64_t i = 1; i <= num_packets; i++) {
-         packets[i].seq = i;
-         size_t bytesRead = fread(packets[i].data, 1, MSS, fp);
-         packets[i].len = bytesRead;
-         packets[i].fin = false;
-         if (bytesRead < MSS) {
-             packets[i].data[bytesRead] = '\0';
-         }
-     }
+    //  packets.resize(num_packets + 1);
+    //  for (uint64_t i = 1; i <= num_packets; i++) {
+    //      packets[i].seq = i;
+    //      size_t bytesRead = fread(packets[i].data, 1, MSS, fp);
+    //      packets[i].len = bytesRead;
+    //      packets[i].fin = false;
+    //      if (bytesRead < MSS) {
+    //          packets[i].data[bytesRead] = '\0';
+    //      }
+    //  }
  }
  
  void ReliableSender::printInfo() {
@@ -169,7 +184,8 @@
      // Ref: https://stackoverflow.com/questions/4181784/how-to-set-socket-timeout-in-c-when-making-multiple-connections
      struct timeval timeout;
      timeout.tv_sec = 0;
-     timeout.tv_usec = TIMEOUT;
+    //  timeout.tv_usec = TIMEOUT;
+     timeout.tv_usec = 0;
      if (setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) < 0) {
          perror("setsockopt failed");
          exit(1);
@@ -289,9 +305,15 @@
          cout << "[*] Sending packet " << nextseqnum << endl;
  #endif
          // Send packet
-         if (sendto(sockfd, &packets[nextseqnum], sizeof(packets[nextseqnum]), 0, (struct sockaddr*)&si_other, slen) == -1) {
+        //  if (sendto(sockfd, &packets[nextseqnum], sizeof(packets[nextseqnum]), 0, (struct sockaddr*)&si_other, slen) == -1) {
+        //      perror("sendto");
+        //      exit(1);
+        //  }
+        Packet pkt = getPacket(nextseqnum);
+         if (sendto(sockfd, &pkt, sizeof(pkt), 0, (struct sockaddr*)&si_other, slen) == -1) {
              perror("sendto");
              exit(1);
+             
          }
          nextseqnum++;
      }
@@ -326,10 +348,14 @@
          cout << "[*] Sending packet " << nextseqnum << endl;
  #endif
          // Send packet
-         if (sendto(sockfd, &packets[nextseqnum], sizeof(packets[nextseqnum]), 0, (struct sockaddr*)&si_other, slen) == -1) {
-             perror("sendto");
-             exit(1);
-         }
+         Packet packet = getPacket(nextseqnum);
+        //  if (sendto(sockfd, &packets[nextseqnum], sizeof(packets[nextseqnum]), 0, (struct sockaddr*)&si_other, slen) == -1) {
+        //      perror("sendto");
+        //      exit(1);
+        //  }
+        if (sendto(sockfd, &packet, sizeof(packet), 0, (struct sockaddr*)&si_other, slen) == -1) {
+            perror("sendto");
+            exit(1);
  
          // First packet in the window
          if (send_base == nextseqnum) {
@@ -340,8 +366,9 @@
      }
      prev_sent_seq = nextseqnum - 1;
  }
+}
  
- void ReliableSender::reliablyTransfer() {
+ void ReliableSender::reliablyTransfer(){
      init();
  
      cout << "[*] Sending " << num_packets << " packets" << endl;
