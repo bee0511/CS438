@@ -255,6 +255,12 @@
      switch (state) {
          case SLOW_START:
          case CONGESTION_AVOID:
+             ssthresh = cwnd / 2;
+             cwnd = TIMEOUT_CWND_DEFAULT;
+             dupACKcount = 0;
+             state = SLOW_START;
+             sendData();
+             break;
          case FAST_RECOVERY:
              ssthresh = cwnd / 2;
              cwnd = 1;
