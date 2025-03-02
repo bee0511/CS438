@@ -53,6 +53,8 @@
      socklen_t slen;
      struct sockaddr_in si_other;
  
+     uint64_t last_packet_byte;
+ 
      uint64_t num_packets;
      uint64_t send_base;
      uint64_t dupACKcount;
@@ -76,7 +78,7 @@
  
      // Helper functions
      void startTimer();
-     Packet getPacket(uint64_t seq);
+     Packet getPacket(uint64_t seq, uint64_t len, bool fin);
      void sendData();
      void sendNewPacket(double prev_cwnd);
  
@@ -96,7 +98,10 @@
      this->sockfd = 0;
      this->slen = 0;
  
-     this->num_packets = (bytesToTransfer + MSS - 1) / MSS;
+     this->num_packets = bytesToTransfer / MSS;
+     if(this->num_packets < (bytesToTransfer + MSS - 1) / MSS){
+         this->last_packet_byte = bytesToTransfer % MSS;
+     }
      this->send_base = 1;
      this->dupACKcount = 0;
      this->state = SLOW_START;
@@ -156,18 +161,39 @@
      cout << "[*] Slow start threshold (ssthresh): " << ssthresh << endl;
  }
  
- Packet ReliableSender::getPacket(uint64_t seq) {
+ Packet ReliableSender::getPacket(uint64_t seq, uint64_t len, bool fin) {
      Packet packet;
      packet.seq = seq;
-     packet.fin = false;
-     if (fseek(fp, (seq - 1) * MSS, SEEK_SET) != 0) {
+     packet.fin = fin;
+     packet.len = len;
+ 
+     if(fin){
+         if(fseek(fp, num_packets * MSS, SEEK_SET) != 0){
+             perror("fseek");
+             exit(1);
+         }
+         size_t read_len = fread(packet.data, 1, last_packet_byte, fp);
+         if (read_len < last_packet_byte) {
+             if (ferror(fp)) {
+                 perror("fread");
+                 exit(1);
+             }
+         }
+         cout << "[*] Read " << read_len << " bytes for the last packet" << endl;
+         return packet;
+     }
+ 
+ 
+     if(fseek(fp, (seq - 1) * MSS, SEEK_SET) != 0){
          perror("fseek");
          exit(1);
      }
-     size_t bytesRead = fread(packet.data, 1, MSS, fp);
-     packet.len = bytesRead;
-     if (bytesRead < MSS) {
-         packet.data[bytesRead] = '\0';
+     size_t read_len = fread(packet.data, 1, len, fp);
+     if (read_len < len) {
+         if (ferror(fp)) {
+             perror("fread");
+             exit(1);
+         }
      }
      return packet;
  }
@@ -278,10 +304,7 @@
  
  void ReliableSender::sendNewPacket(double prev_cwnd) {
      if (send_base > num_packets) {
-         Packet finPacket;
-         finPacket.seq = 0;
-         finPacket.len = 0;
-         finPacket.fin = true;
+         Packet finPacket = getPacket(0, last_packet_byte, true);
          if (sendto(sockfd, &finPacket, sizeof(finPacket), 0, (struct sockaddr*)&si_other, slen) == -1) {
              perror("sendto");
              exit(1);
@@ -304,7 +327,7 @@
          cout << "\033[1;30m";  // Set output color to be gray
          cout << "[*] Sending new packet " << nextseqnum << endl;
  #endif
-         Packet pkt = getPacket(nextseqnum);
+         Packet pkt = getPacket(nextseqnum, MSS, false);
          if (sendto(sockfd, &pkt, sizeof(pkt), 0, (struct sockaddr*)&si_other, slen) == -1) {
              perror("sendto");
              exit(1);
@@ -316,10 +339,7 @@
  
  void ReliableSender::sendData() {
      if (send_base > num_packets) {
-         Packet finPacket;
-         finPacket.seq = 0;
-         finPacket.len = 0;
-         finPacket.fin = true;
+         Packet finPacket = getPacket(0, last_packet_byte, true);
          if (sendto(sockfd, &finPacket, sizeof(finPacket), 0, (struct sockaddr*)&si_other, slen) == -1) {
              perror("sendto");
              exit(1);
@@ -341,7 +361,7 @@
          cout << "[*] Sending packet " << nextseqnum << endl;
  #endif
          // Send packet
-         Packet packet = getPacket(nextseqnum);
+         Packet packet = getPacket(nextseqnum, MSS, false);
          if (sendto(sockfd, &packet, sizeof(packet), 0, (struct sockaddr*)&si_other, slen) == -1) {
              perror("sendto");
              exit(1);
