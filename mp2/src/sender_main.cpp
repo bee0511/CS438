@@ -318,13 +318,8 @@
          return;
      }
  
-     // New packets within the congestion window
-     uint64_t nextseqnum = prev_sent_seq + 1;
- 
-     if (isRetransmit) {
-         // Retransmit all packets within the congestion window
-         nextseqnum = send_base;
-     }
+     // Start from the beginning of the congestion window or the new packet
+     uint64_t nextseqnum = (isRetransmit) ? send_base : prev_sent_seq + 1;
  
      while (nextseqnum <= num_packets && nextseqnum < send_base + cwnd) {
          // Skip if packet is already acked
@@ -342,7 +337,7 @@
  void ReliableSender::reliablyTransfer() {
      init();
  
-     sendPacket(getPacket(1, MSS, false));
+     transmitPackets(false);
      startTimer();
      uint64_t ack;
      while (true) {
