@@ -2,7 +2,7 @@
  * File:   receiver_main.cpp
  * Author: Jian-Fong Yu
  *
- * Created on
+ * Created on 3/2/2025
  */
 
  #include <arpa/inet.h>
@@ -35,9 +35,11 @@
      FILE* fp;
      map<uint64_t, Packet> buffer;
  
+     void init();
+ 
     public:
      ReliableReceiver(unsigned short int myUDPport, char* destinationFile);
-     void init();
+     ~ReliableReceiver();
      void reliablyReceive();
  };
  
@@ -48,6 +50,15 @@
      this->slen = 0;
      this->fp = NULL;
      this->buffer.clear();
+ }
+ 
+ ReliableReceiver::~ReliableReceiver() {
+     if (this->fp != NULL) {
+         fclose(this->fp);
+     }
+     if (this->s != 0) {
+         close(this->s);
+     }
  }
  
  void ReliableReceiver::init() {
@@ -118,14 +129,8 @@
      }
      // Write the last packet
      fwrite(buffer.begin()->second.data, sizeof(char), buffer.begin()->second.len, fp);
-     fclose(fp);
-     close(s);
-     return;
  }
  
- /*
-  *
-  */
  int main(int argc, char** argv) {
      if (argc != 3) {
          fprintf(stderr, "usage: %s UDP_port filename_to_write\n\n", argv[0]);

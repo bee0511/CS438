@@ -2,7 +2,7 @@
  * File:   sender_main.cpp
  * Author: Jian-Fong Yu
  *
- * Created on
+ * Created on 3/2/2025
  */
 
  #include <arpa/inet.h>
@@ -27,12 +27,11 @@
  #include "packet.h"
  #include "params.h"
  
- #define DEBUG 1
  #define DEBUG_SEND 1
- #define DEBUG_INFO 1
- #define DEBUG_NEWACK 1
- #define DEBUG_DUPACK 1
- #define DEBUG_TIMEOUT 1
+ // #define DEBUG_INFO 1
+ // #define DEBUG_NEWACK 1
+ // #define DEBUG_DUPACK 1
+ // #define DEBUG_TIMEOUT 1
  
  using namespace std;
  
@@ -53,12 +52,11 @@
      socklen_t slen;
      struct sockaddr_in si_other;
  
-     uint64_t last_packet_byte;
- 
      uint64_t num_packets;
      uint64_t send_base;
-     uint64_t dupACKcount;
      uint64_t prev_sent_seq;
+     uint64_t last_packet_byte;
+     uint64_t dupACKcount;
      enum State { SLOW_START,
                   CONGESTION_AVOID,
                   FAST_RECOVERY } state;
@@ -67,25 +65,22 @@
  
      unordered_map<uint64_t, bool> acked;
  
-    public:
-     ReliableSender(char* hostname, unsigned short int hostUDPport, char* filename, unsigned long long int bytesToTransfer);
-     // Main functions
      void init();
-     void reliablyTransfer();
- 
-     // Debug functions
-     void printInfo();
- 
-     // Helper functions
      void startTimer();
      Packet getPacket(uint64_t seq, uint64_t len, bool fin);
-     void sendData();
-     void sendNewPacket(double prev_cwnd);
- 
-     // State handlers
+     void sendPacket(Packet packet);
+     void transmitPackets(bool isRetransmit);
      void newACKHandler(const uint64_t ack);
      void dupACKHandler(const uint64_t ack);
      void TimeoutHandler();
+ 
+    public:
+     ReliableSender(char* hostname, unsigned short int hostUDPport, char* filename, unsigned long long int bytesToTransfer);
+     ~ReliableSender();
+ 
+     void reliablyTransfer();
+ 
+     void printInfo();
  };
  
  ReliableSender::ReliableSender(char* hostname, unsigned short int hostUDPport, char* filename, unsigned long long int bytesToTransfer) {
@@ -99,7 +94,7 @@
      this->slen = 0;
  
      this->num_packets = bytesToTransfer / MSS;
-     if(this->num_packets < (bytesToTransfer + MSS - 1) / MSS){
+     if (this->num_packets < (bytesToTransfer + MSS - 1) / MSS) {
          this->last_packet_byte = bytesToTransfer % MSS;
      }
      this->send_base = 1;
@@ -109,6 +104,15 @@
      this->ssthresh = 64.0;  // 64 window size
      this->prev_sent_seq = 1;
      this->acked.clear();
+ }
+ 
+ ReliableSender::~ReliableSender() {
+     if (sockfd != 0) {
+         close(sockfd);
+     }
+     if (fp != nullptr) {
+         fclose(fp);
+     }
  }
  
  void ReliableSender::init() {
@@ -167,35 +171,39 @@
      packet.fin = fin;
      packet.len = len;
  
-     if(fin){
-         if(fseek(fp, num_packets * MSS, SEEK_SET) != 0){
-             perror("fseek");
-             exit(1);
-         }
-         size_t read_len = fread(packet.data, 1, last_packet_byte, fp);
-         if (read_len < last_packet_byte) {
-             if (ferror(fp)) {
-                 perror("fread");
-                 exit(1);
-             }
-         }
-         cout << "[*] Read " << read_len << " bytes for the last packet" << endl;
-         return packet;
-     }
+     size_t read_len;
+     uint64_t offset = (fin) ? num_packets * MSS : (seq - 1) * MSS;
+     size_t bytes_to_read = (fin) ? last_packet_byte : len;
  
- 
-     if(fseek(fp, (seq - 1) * MSS, SEEK_SET) != 0){
+     if (fseek(fp, offset, SEEK_SET) != 0) {
          perror("fseek");
          exit(1);
      }
-     size_t read_len = fread(packet.data, 1, len, fp);
-     if (read_len < len) {
-         if (ferror(fp)) {
-             perror("fread");
-             exit(1);
-         }
+     read_len = fread(packet.data, 1, bytes_to_read, fp);
+     if (read_len < bytes_to_read && ferror(fp)) {
+         perror("fread");
+         exit(1);
      }
+ 
+ #ifdef DEBUG_SEND
+     if (fin) {
+         cout << "\033[1;30m";  // Set output color to be gray
+         cout << "[*] Read " << read_len << " bytes for the last packet" << endl;
+     }
+ #endif
+ 
      return packet;
+ }
+ 
+ void ReliableSender::sendPacket(Packet packet) {
+ #ifdef DEBUG_SEND
+     cout << "\033[1;30m";  // Set output color to be gray
+     cout << "[*] Sending packet " << packet.seq << endl;
+ #endif
+     if (sendto(sockfd, &packet, sizeof(packet), 0, (struct sockaddr*)&si_other, slen) == -1) {
+         perror("sendto");
+         exit(1);
+     }
  }
  
  void ReliableSender::startTimer() {
@@ -216,24 +224,22 @@
      cout << "\033[1;32m";  // Set output color to be green
      cout << "[+] Received new ACK " << ack << endl;
  #endif
-     double prev_cwnd = cwnd;
      switch (state) {
          case SLOW_START:
              cwnd++;
              dupACKcount = 0;
-             sendNewPacket(prev_cwnd);
+             transmitPackets(false);
              break;
          case CONGESTION_AVOID:
              cwnd += 1.0 / cwnd;
              dupACKcount = 0;
-             sendNewPacket(prev_cwnd);
-             // sendData();
+             transmitPackets(false);
              break;
          case FAST_RECOVERY:
              cwnd = ssthresh;
              dupACKcount = 0;
              state = CONGESTION_AVOID;
-             sendNewPacket(prev_cwnd);
+             transmitPackets(false);
              break;
          default:
              break;
@@ -248,7 +254,6 @@
      cout << "\033[1;33m";  // Set output color to be yellow
      cout << "[*] Received duplicate ACK " << ack << endl;
  #endif
-     double prev_cwnd = cwnd;
      switch (state) {
          case SLOW_START:
          case CONGESTION_AVOID:
@@ -257,13 +262,12 @@
                  ssthresh = cwnd / 2;
                  cwnd = ssthresh + 3;
                  state = FAST_RECOVERY;
-                 sendData();
+                 transmitPackets(true);
              }
              break;
          case FAST_RECOVERY:
              cwnd++;
-             sendNewPacket(prev_cwnd);
- 
+             transmitPackets(false);
              break;
          default:
              break;
@@ -276,7 +280,11 @@
  void ReliableSender::TimeoutHandler() {
  #ifdef DEBUG_TIMEOUT
      cout << "\033[1;31m";  // Set output color to be red
-     cout << "[!] Timeout for packet: " << send_base << endl;
+     if (send_base == num_packets + 1) {
+         cout << "[!] Timeout for FIN packet" << endl;
+     } else {
+         cout << "[!] Timeout for packet: " << send_base << endl;
+     }
  #endif
      switch (state) {
          case SLOW_START:
@@ -285,14 +293,14 @@
              cwnd = TIMEOUT_CWND_DEFAULT;
              dupACKcount = 0;
              state = SLOW_START;
-             sendData();
+             transmitPackets(true);
              break;
          case FAST_RECOVERY:
              ssthresh = cwnd / 2;
              cwnd = 1;
              dupACKcount = 0;
              state = SLOW_START;
-             sendData();
+             transmitPackets(true);
              break;
          default:
              break;
@@ -302,53 +310,22 @@
  #endif
  }
  
- void ReliableSender::sendNewPacket(double prev_cwnd) {
+ void ReliableSender::transmitPackets(bool isRetransmit) {
+     startTimer();
      if (send_base > num_packets) {
-         Packet finPacket = getPacket(0, last_packet_byte, true);
-         if (sendto(sockfd, &finPacket, sizeof(finPacket), 0, (struct sockaddr*)&si_other, slen) == -1) {
-             perror("sendto");
-             exit(1);
-         }
+         // Send FIN packet
+         sendPacket(getPacket(0, last_packet_byte, true));
          return;
      }
-     // No new packet to send
-     if (cwnd - prev_cwnd < 1) {
-         return;
-     }
-     // Send new packets within the congestion window
+ 
+     // New packets within the congestion window
      uint64_t nextseqnum = prev_sent_seq + 1;
-     while (nextseqnum <= num_packets && nextseqnum < send_base + cwnd) {
-         // Skip if packet is already acked
-         if (acked[nextseqnum] == true) {
-             nextseqnum++;
-             continue;
-         }
- #ifdef DEBUG_SEND
-         cout << "\033[1;30m";  // Set output color to be gray
-         cout << "[*] Sending new packet " << nextseqnum << endl;
- #endif
-         Packet pkt = getPacket(nextseqnum, MSS, false);
-         if (sendto(sockfd, &pkt, sizeof(pkt), 0, (struct sockaddr*)&si_other, slen) == -1) {
-             perror("sendto");
-             exit(1);
-         }
-         nextseqnum++;
-     }
-     prev_sent_seq = nextseqnum - 1;
- }
  
- void ReliableSender::sendData() {
-     if (send_base > num_packets) {
-         Packet finPacket = getPacket(0, last_packet_byte, true);
-         if (sendto(sockfd, &finPacket, sizeof(finPacket), 0, (struct sockaddr*)&si_other, slen) == -1) {
-             perror("sendto");
-             exit(1);
-         }
-         return;
+     if (isRetransmit) {
+         // Retransmit all packets within the congestion window
+         nextseqnum = send_base;
      }
  
-     // Send packets within the congestion window
-     uint64_t nextseqnum = send_base;
      while (nextseqnum <= num_packets && nextseqnum < send_base + cwnd) {
          // Skip if packet is already acked
          if (acked[nextseqnum] == true) {
@@ -356,21 +333,7 @@
              continue;
          }
  
- #ifdef DEBUG_SEND
-         cout << "\033[1;30m";  // Set output color to be gray
-         cout << "[*] Sending packet " << nextseqnum << endl;
- #endif
-         // Send packet
-         Packet packet = getPacket(nextseqnum, MSS, false);
-         if (sendto(sockfd, &packet, sizeof(packet), 0, (struct sockaddr*)&si_other, slen) == -1) {
-             perror("sendto");
-             exit(1);
-         }
-         // First packet in the window
-         if (send_base == nextseqnum) {
-             // Keep track of the first packet in the window
-             startTimer();
-         }
+         sendPacket(getPacket(nextseqnum, MSS, false));
          nextseqnum++;
      }
      prev_sent_seq = nextseqnum - 1;
@@ -379,8 +342,8 @@
  void ReliableSender::reliablyTransfer() {
      init();
  
-     cout << "[*] Sending " << num_packets << " packets" << endl;
-     sendData();
+     sendPacket(getPacket(1, MSS, false));
+     startTimer();
      uint64_t ack;
      while (true) {
          if (cwnd >= ssthresh && state == SLOW_START) {
@@ -407,7 +370,7 @@
          if (acked[ack] == false) {
              // New ACK
              newACKHandler(ack);
-         } else if (acked[ack] == true) {
+         } else {
              // Duplicate ACK
              dupACKHandler(ack);
          }
@@ -420,8 +383,6 @@
  
      cout << "\033[0m";  // Set output color to be white
      cout << "[*] File transfer completed" << endl;
-     close(sockfd);
-     fclose(fp);
      return;
  }
  
@@ -436,7 +397,6 @@
      cout << "[*] CONGESTION_AVOID: " << state_count.congestion_avoid_count << endl;
      cout << "[*] FAST_RECOVERY: " << state_count.fast_recovery_count << endl;
  #endif
- 
      exit(signum);
  }
  
