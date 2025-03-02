@@ -7,3 +7,4 @@ Version: 6, score: 50, extra days: 0
 Version: 7, score: 0, extra days: 0
 Version: 8, score: 50, extra days: 0
 Version: 9, score: 80, extra days: 0
+Version: 10, score: 0, extra days: 0
