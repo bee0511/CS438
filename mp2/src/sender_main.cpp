@@ -115,6 +115,7 @@
      }
  }
  
+ // Initialize the sender's descriptor and open the file
  void ReliableSender::init() {
      // Open the file
      fp = fopen(filename, "rb");
@@ -139,6 +140,7 @@
      }
  }
  
+ // Print the current state of the sender
  void ReliableSender::printInfo() {
      cout << "\033[0m";  // Set output color to be white
      cout << "[*] Send base: " << send_base << endl;
@@ -165,6 +167,7 @@
      cout << "[*] Slow start threshold (ssthresh): " << ssthresh << endl;
  }
  
+ // Get the packet based on the sequence number
  Packet ReliableSender::getPacket(uint64_t seq, uint64_t len, bool fin) {
      Packet packet;
      packet.seq = seq;
@@ -195,6 +198,7 @@
      return packet;
  }
  
+ // Send the packet to the receiver
  void ReliableSender::sendPacket(Packet packet) {
  #ifdef DEBUG_SEND
      cout << "\033[1;30m";  // Set output color to be gray
@@ -206,9 +210,9 @@
      }
  }
  
+ // Set timeout for the socket
+ // Ref: https://stackoverflow.com/questions/4181784/how-to-set-socket-timeout-in-c-when-making-multiple-connections
  void ReliableSender::startTimer() {
-     // Set timeout for the socket
-     // Ref: https://stackoverflow.com/questions/4181784/how-to-set-socket-timeout-in-c-when-making-multiple-connections
      struct timeval timeout;
      timeout.tv_sec = 0;
      timeout.tv_usec = TIMEOUT;
@@ -218,6 +222,10 @@
      }
  }
  
+ /*
+  * New ACK handler in the state machine
+  * Change the congestion window size based on the current state
+  */
  void ReliableSender::newACKHandler(const uint64_t ack) {
      acked[ack] = true;
  #ifdef DEBUG_NEWACK
@@ -249,6 +257,11 @@
  #endif
  }
  
+ /*
+  * Duplicate ACK handler in the state machine
+  * If 3 duplicate ACKs are received, then perform fast recovery
+  * Otherwise, increase the congestion window size by 1
+  */
  void ReliableSender::dupACKHandler(const uint64_t ack) {
  #ifdef DEBUG_DUPACK
      cout << "\033[1;33m";  // Set output color to be yellow
@@ -277,6 +290,11 @@
  #endif
  }
  
+ /*
+  * Timeout handler in the state machine
+  * Reset the congestion window size and slow start threshold
+  * Retransmit the packets starting from the send_base
+  */
  void ReliableSender::TimeoutHandler() {
  #ifdef DEBUG_TIMEOUT
      cout << "\033[1;31m";  // Set output color to be red
@@ -310,6 +328,12 @@
  #endif
  }
  
+ /*
+  * Transmit packets and start the timer for the first packet
+  * If isRetransmit is true, then retransmit the packets starting from the send_base (all packets)
+  * Otherwise, transmit the packets starting from the nextseqnum (new packets)
+  *
+  */
  void ReliableSender::transmitPackets(bool isRetransmit) {
      startTimer();
      if (send_base > num_packets) {
@@ -334,6 +358,7 @@
      prev_sent_seq = nextseqnum - 1;
  }
  
+ // Main function to reliably transfer the file
  void ReliableSender::reliablyTransfer() {
      init();
  
