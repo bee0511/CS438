@@ -9,3 +9,4 @@ Version: 8, score: 50, extra days: 0
 Version: 9, score: 80, extra days: 0
 Version: 10, score: 0, extra days: 0
 Version: 11, score: 100, extra days: 0
+Version: 12, score: 0, extra days: 0
