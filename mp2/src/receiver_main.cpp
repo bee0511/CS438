@@ -112,14 +112,12 @@
          }
      }
  
-     // Write to file
-     for (auto it = buffer.begin(); it != buffer.end(); it++) {
-         if (it->first == 0) {
-             continue;
-         }
+     // Write to file, skip the first packet (which is fin packet)
+     for (auto it = std::next(buffer.begin()); it != buffer.end(); it++) {
          fwrite(it->second.data, sizeof(char), it->second.len, fp);
      }
- 
+     // Write the last packet
+     fwrite(buffer.begin()->second.data, sizeof(char), buffer.begin()->second.len, fp);
      fclose(fp);
      close(s);
      return;
