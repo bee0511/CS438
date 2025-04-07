@@ -1,294 +1,49 @@
-#include <limits.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+#include "route.hpp"
 
-#include <iostream>
-#include <queue>
-#include <unordered_map>
-#include <vector>
-
-using namespace std;
-
-struct Message {
-    int src;            // Source node ID
-    int dest;           // Destination node ID
-    char message[100];  // Message text
-};
-
-class LinkState {
-   private:
-    unordered_map<int, vector<pair<int, int>>> g;  // Graph represented as an adjacency list
-    unordered_map<int, vector<int>> dist;          // Distance from the node to each other node
-    unordered_map<int, vector<int>> prev;          // Previous node in the shortest path
-    unordered_map<int, vector<int>> next;          // Next node in the shortest path
-    vector<Message> messages;
-    int num_nodes;  // Number of nodes in the graph
-
+class LinkState : public BaseRouter {
    public:
-    LinkState(const char *topofile, const char *messagefile) {
-        g.clear();
-        dist.clear();
-        num_nodes = 0;
-        readTopologyFile(topofile);
-        readMessageFile(messagefile);
-    };
-    void readTopologyFile(const char *filename);
-    void readMessageFile(const char *filename);
+    LinkState(const char *topofile, const char *messagefile) : BaseRouter(topofile, messagefile) {}
+    void calculatePaths(int src) override {
+        // Initialize distances
+        dist[src].clear();
+        prev[src].clear();
+        dist[src].resize(num_nodes + 1, INT_MAX);
+        prev[src].resize(num_nodes + 1, -1);
 
-    void printForwardingTable(int node);
-    void printMessage(int index);
+        dist[src][src] = 0;
+        prev[src][src] = src;
+        vector<bool> visited(num_nodes + 1, false);
 
-    void writeForwardingTable(int node, FILE *fp);
-    void writeMessage(int index, FILE *fp);
+        // Priority queue to select the node with the smallest distance
+        priority_queue<pair<int, int>, vector<pair<int, int>>, greater<pair<int, int>>> pq;
+        pq.push({0, src});  // {distance, node}
+        while (!pq.empty()) {
+            int u = pq.top().second;
+            pq.pop();
 
-    int getNumNodes();
-    int getNumMessages();
+            if (visited[u]) continue;
+            visited[u] = true;
 
-    void addEdge(int u, int v, int w);
-    void removeEdge(int u, int v);
-    void updateEdge(int u, int v, int w);
+            for (auto &edge : g[u]) {
+                int v = edge.first;
+                int w = edge.second;
 
-    void dijkstra(int src);
-    void buildForwardingTable(int src);
-    vector<int> getPath(int src, int dest);
-};
-
-int LinkState::getNumNodes() {
-    return num_nodes;
-}
-int LinkState::getNumMessages() {
-    return messages.size();
-}
-
-void LinkState::addEdge(int u, int v, int w) {
-    g[u].push_back({v, w});
-    g[v].push_back({u, w});
-}
-
-void LinkState::removeEdge(int u, int v) {
-    for (auto it = g[u].begin(); it != g[u].end(); ++it) {
-        if (it->first == v) {
-            g[u].erase(it);
-            break;
-        }
-    }
-    for (auto it = g[v].begin(); it != g[v].end(); ++it) {
-        if (it->first == u) {
-            g[v].erase(it);
-            break;
-        }
-    }
-}
-
-void LinkState::updateEdge(int u, int v, int w) {
-    removeEdge(u, v);
-    if (w != -999) {
-        addEdge(u, v, w);
-    }
-}
-
-void LinkState::dijkstra(int src) {
-    // Initialize distances
-    dist[src].clear();
-    prev[src].clear();
-    dist[src].resize(num_nodes + 1, INT_MAX);
-    prev[src].resize(num_nodes + 1, -1);
-
-    dist[src][src] = 0;
-    prev[src][src] = src;
-    vector<bool> visited(num_nodes + 1, false);
-
-    // Priority queue to select the node with the smallest distance
-    priority_queue<pair<int, int>, vector<pair<int, int>>, greater<pair<int, int>>> pq;
-    pq.push({0, src});  // {distance, node}
-    while (!pq.empty()) {
-        int u = pq.top().second;
-        pq.pop();
-
-        if (visited[u]) continue;
-        visited[u] = true;
-
-        for (auto &edge : g[u]) {
-            int v = edge.first;
-            int w = edge.second;
-
-            if (dist[src][u] + w < dist[src][v]) {
-                dist[src][v] = dist[src][u] + w;
-                prev[src][v] = u;
-                pq.push({dist[src][v], v});
-            }
-            // If there is a tie, choose the lowest node ID
-            else if (dist[src][u] + w == dist[src][v]) {
-                if (prev[src][v] == -1 || u < prev[src][v]) {
+                if (dist[src][u] + w < dist[src][v]) {
+                    dist[src][v] = dist[src][u] + w;
                     prev[src][v] = u;
                     pq.push({dist[src][v], v});
+                }
+                // If there is a tie, choose the lowest node ID
+                else if (dist[src][u] + w == dist[src][v]) {
+                    if (prev[src][v] == -1 || u < prev[src][v]) {
+                        prev[src][v] = u;
+                        pq.push({dist[src][v], v});
+                    }
                 }
             }
         }
     }
-}
-
-void LinkState::readTopologyFile(const char *filename) {
-    /* Input format: <ID of a node> <ID of another node> <cost of the link between them>
-     * Example:
-     * 1 2 8
-     * 2 3 3
-     * 2 5 4
-     * 4 1 1
-     * 4 5 1
-     */
-    FILE *fp = fopen(filename, "r");
-    if (fp == NULL) {
-        printf("Error opening file %s\n", filename);
-        return;
-    }
-
-    int u, v, w;
-    while (fscanf(fp, "%d %d %d", &u, &v, &w) != EOF) {
-        addEdge(u, v, w);
-        if (u > num_nodes) {
-            num_nodes = u;
-        }
-        if (v > num_nodes) {
-            num_nodes = v;
-        }
-    }
-    fclose(fp);
-}
-
-void LinkState::readMessageFile(const char *filename) {
-    /* Input format: <source node ID> <dest node ID> <message text>
-     * Example:
-     * 2 1 here is a message from 2 to 1
-     */
-    FILE *fp = fopen(filename, "r");
-    if (fp == NULL) {
-        printf("Error opening file %s\n", filename);
-        return;
-    }
-
-    int src, dest;
-    char message[100];
-    while (fscanf(fp, "%d %d %[^\n]", &src, &dest, message) != EOF) {
-        Message msg;
-        msg.src = src;
-        msg.dest = dest;
-        strncpy(msg.message, message, sizeof(msg.message));
-        messages.push_back(msg);
-    }
-    fclose(fp);
-}
-
-void LinkState::buildForwardingTable(int src) {
-    next[src].clear();
-    next[src].resize(num_nodes + 1, -1);
-
-    for (int i = 1; i <= num_nodes; i++) {
-        if (dist[src][i] == INT_MAX) {
-            next[src][i] = -1;  // No path found
-            continue;
-        }
-        if (i == src) {
-            next[src][i] = src;
-            continue;
-        }
-        if (prev[src][i] == src) {
-            next[src][i] = i;
-            continue;
-        }
-        int cur = prev[src][i];
-        while (prev[src][cur] != src) {
-            cur = prev[src][cur];
-        }
-        next[src][i] = cur;
-    }
-}
-
-// Print the forwarding table for a given node
-void LinkState::printForwardingTable(int node) {
-    printf("Forwarding table for node %d:\n", node);
-    printf("Dest\tNext Hop\tCost\n");
-    for (int i = 1; i <= num_nodes; i++) {
-        if (dist[node][i] == INT_MAX) {
-            continue;
-        }
-        printf("%d\t%d\t\t%d\n", i, next[node][i], dist[node][i]);
-    }
-}
-
-/*
-    Print the message at the given index with the format:
-    from <x> to <y> cost <path_cost> hops <hop1> <hop2> <...> message <message>
-    if the path is not found, print:
-    from <x> to <y> costinfinite hops unreachable message <message>
-*/
-void LinkState::printMessage(int index) {
-    if (index < 0 || index >= messages.size()) {
-        printf("Invalid message index\n");
-        return;
-    }
-    Message msg = messages[index];
-
-    int src = msg.src;
-    int dest = msg.dest;
-    int path_cost = dist[src][dest];
-    vector<int> path = getPath(src, dest);
-    if (path.empty()) {
-        printf("from %d to %d cost infinite hops unreachable message %s\n", src, dest, msg.message);
-        return;
-    }
-    printf("from %d to %d cost %d hops ", src, dest, path_cost);
-    for (int i = 0; i < path.size(); i++) {
-        printf("%d ", path[i]);
-    }
-    printf("message %s\n", msg.message);
-}
-
-vector<int> LinkState::getPath(int src, int dest) {
-    vector<int> path;
-    if (dist[src][dest] == INT_MAX) {
-        return path;  // No path found
-    }
-    int cur = src;
-    while (cur != dest) {
-        path.push_back(cur);
-        cur = next[cur][dest];
-    }
-    // Do not record the last node
-    return path;
-}
-
-void LinkState::writeForwardingTable(int node, FILE *fp) {
-    for (int i = 1; i <= num_nodes; i++) {
-        if (dist[node][i] == INT_MAX) {
-            continue;
-        }
-        fprintf(fp, "%d %d %d\n", i, next[node][i], dist[node][i]);
-    }
-}
-
-void LinkState::writeMessage(int index, FILE *fp) {
-    if (index < 0 || index >= messages.size()) {
-        fprintf(fp, "Invalid message index\n");
-        return;
-    }
-    Message msg = messages[index];
-
-    int src = msg.src;
-    int dest = msg.dest;
-    int path_cost = dist[src][dest];
-    vector<int> path = getPath(src, dest);
-    if (path.empty()) {
-        fprintf(fp, "from %d to %d cost infinite hops unreachable message %s\n", src, dest, msg.message);
-        return;
-    }
-    fprintf(fp, "from %d to %d cost %d hops ", src, dest, path_cost);
-    for (int i = 0; i < path.size(); i++) {
-        fprintf(fp, "%d ", path[i]);
-    }
-    fprintf(fp, "message %s\n", msg.message);
-}
+};
 
 int main(int argc, char **argv) {
     if (argc != 4) {
@@ -324,7 +79,7 @@ int main(int argc, char **argv) {
         }
         // Run Dijkstra's algorithm for each node
         for (int i = 1; i <= ls.getNumNodes(); i++) {
-            ls.dijkstra(i);
+            ls.calculatePaths(i);
         }
         for (int i = 1; i <= ls.getNumNodes(); i++) {
             ls.buildForwardingTable(i);

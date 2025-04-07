@@ -7,8 +7,8 @@ LINKLIBS = -lpthread
 
 #The components of each program. When you create a src/foo.c source file, add obj/foo.o here, separated
 #by a space (e.g. SOMEOBJECTS = obj/foo.o obj/bar.o obj/baz.o).
-LINKSTATEOBJECTS = obj/linkstate.o
-DISTVECOBJECTS = obj/distvec.o
+LINKSTATEOBJECTS = obj/linkstate.o obj/route.o
+DISTVECOBJECTS = obj/distvec.o obj/route.o
 #CLIENTOBJECTS = obj/sender_main.o
 #TALKEROBJECTS = obj/talker.o
 #LISTENEROBJECTS = obj/listener.o
