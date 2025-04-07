@@ -192,6 +192,10 @@ void LinkState::buildForwardingTable(int src) {
     next[src].resize(num_nodes + 1, -1);
 
     for (int i = 1; i <= num_nodes; i++) {
+        if (dist[src][i] == INT_MAX) {
+            next[src][i] = -1;  // No path found
+            continue;
+        }
         if (i == src) {
             next[src][i] = src;
             continue;
@@ -213,6 +217,9 @@ void LinkState::printForwardingTable(int node) {
     printf("Forwarding table for node %d:\n", node);
     printf("Dest\tNext Hop\tCost\n");
     for (int i = 1; i <= num_nodes; i++) {
+        if (dist[node][i] == INT_MAX) {
+            continue;
+        }
         printf("%d\t%d\t\t%d\n", i, next[node][i], dist[node][i]);
     }
 }
@@ -261,6 +268,9 @@ vector<int> LinkState::getPath(int src, int dest) {
 
 void LinkState::writeForwardingTable(int node, FILE *fp) {
     for (int i = 1; i <= num_nodes; i++) {
+        if (dist[node][i] == INT_MAX) {
+            continue;
+        }
         fprintf(fp, "%d %d %d\n", i, next[node][i], dist[node][i]);
     }
 }
