@@ -2,7 +2,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>  // For sleep function
 
 #include <iostream>
 #include <queue>
@@ -15,12 +14,6 @@ struct Message {
     int src;            // Source node ID
     int dest;           // Destination node ID
     char message[100];  // Message text
-};
-
-struct EdgeChange {
-    int src;   // Source node ID
-    int dest;  // Destination node ID
-    int cost;  // Cost of the link between them
 };
 
 class LinkState {
