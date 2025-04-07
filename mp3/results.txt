@@ -1,4 +1,4 @@
-Version: 1, score: 45, extra days: 0
+Version: 2, score: 55, extra days: 0
 
 
 -------------------------
@@ -14,7 +14,7 @@ Program executed correctly
 
 Test 3 
 LS: Path change to unreachable
-Linkstate stalled 
+Program executed correctly 
 
 Test 4 
 LS: Link addition
@@ -30,7 +30,7 @@ Program executed correctly
 
 Test 7 
 LS: Changes to topology in MP instructions, 1 path unreachable
-Linkstate stalled 
+Program executed correctly 
 
 Test 8 
 LS: Multiple changes to topology in MP instructions
@@ -75,6 +75,6 @@ Incorrect Distance Vector output
 Test 9 
 DV: Node topology
 Incorrect Distance Vector output 
-Score = 45
+Score = 55
 -------------------------
 
