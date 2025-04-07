@@ -52,7 +52,7 @@ int main(int argc, char **argv) {
     }
 
     // Parse topology file
-    LinkState ls(argv[1], argv[2]);
+    LinkState router(argv[1], argv[2]);
 
     // Open the changes file
     // File format: <ID of a node> <ID of another node> <cost of the link between them>
@@ -75,20 +75,20 @@ int main(int argc, char **argv) {
     do {
         if (u != -1 && v != -1 && w != -1) {
             // Update the edge in the graph
-            ls.updateEdge(u, v, w);
+            router.updateEdge(u, v, w);
         }
         // Run Dijkstra's algorithm for each node
-        for (int i = 1; i <= ls.getNumNodes(); i++) {
-            ls.calculatePaths(i);
+        for (int i = 1; i <= router.getNumNodes(); i++) {
+            router.calculatePaths(i);
         }
-        for (int i = 1; i <= ls.getNumNodes(); i++) {
-            ls.buildForwardingTable(i);
-            ls.printForwardingTable(i);
-            ls.writeForwardingTable(i, fpOut);
+        for (int i = 1; i <= router.getNumNodes(); i++) {
+            router.buildForwardingTable(i);
+            router.printForwardingTable(i);
+            router.writeForwardingTable(i, fpOut);
         }
-        for (int i = 0; i < ls.getNumMessages(); i++) {
-            ls.printMessage(i);
-            ls.writeMessage(i, fpOut);
+        for (int i = 0; i < router.getNumMessages(); i++) {
+            router.printMessage(i);
+            router.writeMessage(i, fpOut);
         }
     } while (fscanf(fp, "%d %d %d", &u, &v, &w) != EOF);
 

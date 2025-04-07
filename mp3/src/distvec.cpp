@@ -15,13 +15,14 @@ class DistanceVector : public BaseRouter {
         for (int i = 1; i <= num_nodes - 1; i++) {
             for (auto it : g) {
                 int u = it.first;
+                if (dist[src][u] == INT_MAX) continue;  // Skip unreachable nodes
                 for (auto edge : it.second) {
                     int v = edge.first;
                     int w = edge.second;
-                    if (dist[src][u] != INT_MAX && dist[src][u] + w < dist[src][v]) {
+                    if (dist[src][u] + w < dist[src][v]) {
                         dist[src][v] = dist[src][u] + w;
                         prev[src][v] = u;
-                    } else if (dist[src][u] != INT_MAX && dist[src][u] + w == dist[src][v]) {
+                    } else if (dist[src][u] + w == dist[src][v]) {
                         // If the distance is the same, prefer the smaller node ID
                         if (prev[src][v] == -1 || u < prev[src][v]) {
                             prev[src][v] = u;
@@ -40,7 +41,7 @@ int main(int argc, char **argv) {
     }
 
     // Parse topology file
-    DistanceVector ls(argv[1], argv[2]);
+    DistanceVector router(argv[1], argv[2]);
 
     // Open the changes file
     // File format: <ID of a node> <ID of another node> <cost of the link between them>
@@ -63,20 +64,20 @@ int main(int argc, char **argv) {
     do {
         if (u != -1 && v != -1 && w != -1) {
             // Update the edge in the graph
-            ls.updateEdge(u, v, w);
+            router.updateEdge(u, v, w);
         }
         // Run Bellman-Ford algorithm for each node
-        for (int i = 1; i <= ls.getNumNodes(); i++) {
-            ls.calculatePaths(i);
+        for (int i = 1; i <= router.getNumNodes(); i++) {
+            router.calculatePaths(i);
         }
-        for (int i = 1; i <= ls.getNumNodes(); i++) {
-            ls.buildForwardingTable(i);
-            ls.printForwardingTable(i);
-            ls.writeForwardingTable(i, fpOut);
+        for (int i = 1; i <= router.getNumNodes(); i++) {
+            router.buildForwardingTable(i);
+            router.printForwardingTable(i);
+            router.writeForwardingTable(i, fpOut);
         }
-        for (int i = 0; i < ls.getNumMessages(); i++) {
-            ls.printMessage(i);
-            ls.writeMessage(i, fpOut);
+        for (int i = 0; i < router.getNumMessages(); i++) {
+            router.printMessage(i);
+            router.writeMessage(i, fpOut);
         }
     } while (fscanf(fp, "%d %d %d", &u, &v, &w) != EOF);
 
