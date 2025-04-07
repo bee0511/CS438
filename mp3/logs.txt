@@ -156,3 +156,82 @@ Incorrect Distance Vector output
 Score = 55
 -------------------------
 
+Version = 3
+
+-------------------------
+Compilation successful for jy98
+
+Test 1 
+LS: Simple Topology
+Program executed correctly 
+
+Test 2 
+LS: Two paths with equal costs
+Program executed correctly 
+
+Test 3 
+LS: Path change to unreachable
+Program executed correctly 
+
+Test 4 
+LS: Link addition
+Program executed correctly 
+
+Test 5 
+LS: Topology in MP instructions
+Program executed correctly 
+
+Test 6 
+LS: Changes to topology in MP instructions
+Program executed correctly 
+
+Test 7 
+LS: Changes to topology in MP instructions, 1 path unreachable
+Program executed correctly 
+
+Test 8 
+LS: Multiple changes to topology in MP instructions
+Program executed correctly 
+
+Test 9 
+LS: Node topology
+Program executed correctly 
+
+Test 1 
+DV: Simple Topology
+Program executed correctly 
+
+Test 2 
+DV: Two paths with equal costs
+Program executed correctly 
+
+Test 3 
+DV: Path change to unreachable
+Program executed correctly 
+
+Test 4 
+DV: Link addition
+Program executed correctly 
+
+Test 5 
+DV: Topology in MP instructions
+Program executed correctly 
+
+Test 6 
+DV: Changes to topology in MP instructions
+Program executed correctly 
+
+Test 7 
+DV: Changes to topology in MP instructions, 1 path unreachable
+Program executed correctly 
+
+Test 8 
+DV: Multiple changes to topology in MP instructions
+Program executed correctly 
+
+Test 9 
+DV: Node topology
+Incorrect Distance Vector output 
+Score = 95
+-------------------------
+
