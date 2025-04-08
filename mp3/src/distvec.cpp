@@ -25,11 +25,6 @@ class DistanceVector : public BaseRouter {
                     if (new_dist < dist[src][v]) {
                         dist[src][v] = new_dist;
                         prev[src][v] = u;
-                    } else if (new_dist == dist[src][v]) {
-                        // If the distance is the same, prefer the smaller node ID
-                        if (prev[src][v] == -1 || u < prev[src][v]) {
-                            prev[src][v] = u;
-                        }
                     }
                 }
             }
