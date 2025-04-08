@@ -12,6 +12,7 @@ class DistanceVector : public BaseRouter {
 
         dist[src][src] = 0;
 
+        // |V| - 1 iterations
         for (int i = 1; i <= num_nodes - 1; i++) {
             for (auto it : g) {
                 int u = it.first;
@@ -19,10 +20,12 @@ class DistanceVector : public BaseRouter {
                 for (auto edge : it.second) {
                     int v = edge.first;
                     int w = edge.second;
-                    if (dist[src][u] + w < dist[src][v]) {
-                        dist[src][v] = dist[src][u] + w;
+                    int new_dist = dist[src][u] + w;
+
+                    if (new_dist < dist[src][v]) {
+                        dist[src][v] = new_dist;
                         prev[src][v] = u;
-                    } else if (dist[src][u] + w == dist[src][v]) {
+                    } else if (new_dist == dist[src][v]) {
                         // If the distance is the same, prefer the smaller node ID
                         if (prev[src][v] == -1 || u < prev[src][v]) {
                             prev[src][v] = u;

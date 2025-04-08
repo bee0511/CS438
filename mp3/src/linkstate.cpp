@@ -27,14 +27,15 @@ class LinkState : public BaseRouter {
             for (auto &edge : g[u]) {
                 int v = edge.first;
                 int w = edge.second;
+                int new_dist = dist[src][u] + w;
 
-                if (dist[src][u] + w < dist[src][v]) {
-                    dist[src][v] = dist[src][u] + w;
+                if (new_dist < dist[src][v]) {
+                    dist[src][v] = new_dist;
                     prev[src][v] = u;
                     pq.push({dist[src][v], v});
                 }
                 // If there is a tie, choose the lowest node ID
-                else if (dist[src][u] + w == dist[src][v]) {
+                else if (new_dist == dist[src][v]) {
                     if (prev[src][v] == -1 || u < prev[src][v]) {
                         prev[src][v] = u;
                         pq.push({dist[src][v], v});
