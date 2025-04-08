@@ -1,4 +1,4 @@
-Version: 5, score: 85, extra days: 0
+Version: 6, score: 95, extra days: 0
 
 
 -------------------------
@@ -46,7 +46,7 @@ Program executed correctly
 
 Test 2 
 DV: Two paths with equal costs
-Incorrect Distance Vector output 
+Program executed correctly 
 
 Test 3 
 DV: Path change to unreachable
@@ -70,11 +70,11 @@ Program executed correctly
 
 Test 8 
 DV: Multiple changes to topology in MP instructions
-Incorrect Distance Vector output 
+Program executed correctly 
 
 Test 9 
 DV: Node topology
 Incorrect Distance Vector output 
-Score = 85
+Score = 95
 -------------------------
 
