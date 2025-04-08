@@ -52,6 +52,8 @@ void BaseRouter::readTopologyFile(const char *filename) {
 
     int u, v, w;
     while (fscanf(fp, "%d %d %d", &u, &v, &w) != EOF) {
+        has_input[u] = true;
+        has_input[v] = true;
         addEdge(u, v, w);
         // Update the number of nodes
         if (u > num_nodes) {
@@ -124,7 +126,7 @@ void BaseRouter::printForwardingTable(int node) {
     printf("Forwarding table for node %d:\n", node);
     printf("Dest\tNext Hop\tCost\n");
     for (int i = 1; i <= num_nodes; i++) {
-        if (dist[node][i] == INT_MAX) {
+        if (dist[node][i] == INT_MAX || !has_input[i]) {
             continue;
         }
         printf("%d\t%d\t\t%d\n", i, next[node][i], dist[node][i]);
@@ -177,7 +179,7 @@ vector<int> BaseRouter::getPath(int src, int dest) {
 // Write the forwarding table for a given node to a file
 void BaseRouter::writeForwardingTable(int node, FILE *fp) {
     for (int i = 1; i <= num_nodes; i++) {
-        if (dist[node][i] == INT_MAX) {
+        if (dist[node][i] == INT_MAX || !has_input[i]) {
             continue;
         }
         fprintf(fp, "%d %d %d\n", i, next[node][i], dist[node][i]);

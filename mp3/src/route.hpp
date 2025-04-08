@@ -7,9 +7,9 @@
 #include <string.h>
 
 #include <iostream>
+#include <queue>
 #include <unordered_map>
 #include <vector>
-#include <queue>
 
 using namespace std;
 
@@ -26,7 +26,8 @@ class BaseRouter {
     unordered_map<int, vector<int>> prev;          // Previous node in the shortest path
     unordered_map<int, vector<int>> next;          // Next node in the shortest path
     vector<Message> messages;
-    int num_nodes;  // Number of nodes in the graph
+    unordered_map<int, bool> has_input;  // Check if the node has input by the user
+    int num_nodes;                       // Number of nodes in the graph
 
    public:
     BaseRouter(const char* topofile, const char* messagefile) {
@@ -40,8 +41,8 @@ class BaseRouter {
 
     void readTopologyFile(const char* filename);
     void readMessageFile(const char* filename);
-    void writeForwardingTable(int node, FILE *fp);
-    void writeMessage(int index, FILE *fp);
+    void writeForwardingTable(int node, FILE* fp);
+    void writeMessage(int index, FILE* fp);
 
     // Virtual function to be implemented by derived classes
     virtual void calculatePaths(int src) = 0;
@@ -53,6 +54,7 @@ class BaseRouter {
 
     int getNumNodes() { return num_nodes; }
     int getNumMessages() { return messages.size(); }
+    int hasInput(int node) { return has_input[node]; }
 
     void addEdge(int u, int v, int w);
     void removeEdge(int u, int v);

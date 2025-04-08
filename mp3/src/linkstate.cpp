@@ -80,9 +80,17 @@ int main(int argc, char **argv) {
         }
         // Run Dijkstra's algorithm for each node
         for (int i = 1; i <= router.getNumNodes(); i++) {
+            if (!router.hasInput(i)) {
+                // Skip nodes that are not in the topology
+                continue;
+            }
             router.calculatePaths(i);
         }
         for (int i = 1; i <= router.getNumNodes(); i++) {
+            if (!router.hasInput(i)) {
+                // Skip nodes that are not in the topology
+                continue;
+            }
             router.buildForwardingTable(i);
             router.printForwardingTable(i);
             router.writeForwardingTable(i, fpOut);
