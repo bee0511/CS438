@@ -1,4 +1,4 @@
-Version: 6, score: 95, extra days: 0
+Version: 7, score: 100, extra days: 0
 
 
 -------------------------
@@ -74,7 +74,7 @@ Program executed correctly
 
 Test 9 
 DV: Node topology
-Incorrect Distance Vector output 
-Score = 95
+Program executed correctly 
+Score = 100
 -------------------------
 
