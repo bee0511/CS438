@@ -7,29 +7,33 @@ class DistanceVector : public BaseRouter {
         // Initialize distances and previous nodes
         dist[src].clear();
         prev[src].clear();
+        next[src].clear();
         dist[src].resize(num_nodes + 1, INT_MAX);
         prev[src].resize(num_nodes + 1, -1);
+        next[src].resize(num_nodes + 1, -1);
 
         dist[src][src] = 0;
+        next[src][src] = src;
 
         // |V| - 1 iterations
         for (int i = 1; i <= num_nodes - 1; i++) {
             for (auto it : g) {
                 int u = it.first;
                 if (dist[src][u] == INT_MAX) continue;  // Skip unreachable nodes
+
+                int nexthop_u = (u == src) ?  -1 : next[src][u];
+
                 for (auto edge : it.second) {
                     int v = edge.first;
                     int w = edge.second;
                     int new_dist = dist[src][u] + w;
 
-                    if (new_dist < dist[src][v]) {
+                    int candidate_nexthop = (u == src) ? v : nexthop_u;
+
+                    if (new_dist < dist[src][v] || (new_dist == dist[src][v] && candidate_nexthop < next[src][v])) {
                         dist[src][v] = new_dist;
                         prev[src][v] = u;
-                    } else if (new_dist == dist[src][v]) {
-                        // If the distance is the same, prefer the smaller node ID
-                        if (prev[src][v] == -1 || u < prev[src][v]) {
-                            prev[src][v] = u;
-                        }
+                        next[src][v] = candidate_nexthop;
                     }
                 }
             }
@@ -82,7 +86,7 @@ int main(int argc, char **argv) {
                 // Skip nodes that are not in the topology
                 continue;
             }
-            router.buildForwardingTable(i);
+            // router.buildForwardingTable(i);
             router.printForwardingTable(i);
             router.writeForwardingTable(i, fpOut);
         }
