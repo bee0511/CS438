@@ -90,7 +90,8 @@ void BaseRouter::readMessageFile(const char *filename) {
     fclose(fp);
 }
 
-// Build the forwarding table for a given source node
+// Build the forwarding table for a given source node by using prev vector
+// Used for Link State Routing, but not for Distance Vector Routing
 void BaseRouter::buildForwardingTable(int src) {
     next[src].clear();
     next[src].resize(num_nodes + 1, -1);

@@ -86,6 +86,7 @@ int main(int argc, char **argv) {
                 // Skip nodes that are not in the topology
                 continue;
             }
+            // Comment out the following line because we compute the nexthop directly in calculatePaths
             // router.buildForwardingTable(i);
             router.printForwardingTable(i);
             router.writeForwardingTable(i, fpOut);
